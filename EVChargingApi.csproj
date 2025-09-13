@@ -13,11 +13,4 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Data\Models\" />
-    <Folder Include="Data\Repositories\" />
-    <Folder Include="Utils\" />
-    <Folder Include="Services\" />
-  </ItemGroup>
-
 </Project>
