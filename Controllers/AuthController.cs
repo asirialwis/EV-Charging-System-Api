@@ -7,6 +7,7 @@ using EVChargingApi.Services;
 using EVChargingApi.Dto;
 using EVChargingApi.Data.Models;
 using Microsoft.AspNetCore.Authorization;
+using EVChargingSystem.WebAPI.Data.Dtos;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -55,7 +56,7 @@ public class AuthController : ControllerBase
 
     [HttpPost("create-operational-user")]
     [Authorize(Roles = "Backoffice")]
-    public async Task<IActionResult> CreateOperationalUser([FromBody] RegisterUserDto userDto)
+    public async Task<IActionResult> CreateOperationalUser([FromBody] CreateOperationalUserDto userDto)
     {
         if (userDto.Role != "Backoffice" && userDto.Role != "StationOperator")
         {
