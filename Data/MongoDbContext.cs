@@ -24,5 +24,11 @@ namespace EVChargingSystem.WebAPI.Data
                 throw; // rethrow so the app fails fast
             }
         }
+
+
+         public IMongoCollection<T> GetCollection<T>(string name)
+        {
+            return _database.GetCollection<T>(name);
+        }
     }
 }
