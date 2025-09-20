@@ -2,30 +2,32 @@ using MongoDB.Driver;
 using EVChargingSystem.WebAPI.Data;
 
 using EVChargingApi.Services;
+using EVChargingSystem.WebAPI.Data.Repositories;
+using EVChargingApi.Data.Models;
 
 namespace EVChargingSystem.WebAPI.Services
 {
     public class UserService : IUserService
     {
-        private readonly IMongoCollection<EVChargingApi.Data.Models.User> _users;
+        // Change from IMongoCollection to IUserRepository
+        private readonly IUserRepository _userRepository;
 
-        public UserService(MongoDbContext context)
+        public UserService(IUserRepository userRepository)
         {
-            // the GetCollection method from the corrected MongoDbContext
-            _users = context.GetCollection<EVChargingApi.Data.Models.User>("Users");
+            _userRepository = userRepository;
         }
 
-        public async Task<EVChargingApi.Data.Models.User> AuthenticateAsync(string email, string password)
+        public async Task<User> AuthenticateAsync(string email, string password)
         {
-            // use a secure password hashing algorithm
-            var user = await _users.Find(u => u.Email == email && u.Password == password).FirstOrDefaultAsync();
+            //service uses the repository method
+            var user = await _userRepository.FindByEmailAndPasswordAsync(email, password);
             return user;
         }
 
-        public async Task CreateAsync(EVChargingApi.Data.Models.User user)
+        public async Task CreateAsync(User user)
         {
-            // In a real app, hash the password before saving
-            await _users.InsertOneAsync(user);
+            // The service calls the repository's create method
+            await _userRepository.CreateAsync(user);
         }
     }
 }

@@ -8,6 +8,7 @@ using EVChargingApi.Services;
 using EVChargingSystem.WebAPI.Services;
 using Swashbuckle.AspNetCore.Filters;
 using Microsoft.OpenApi.Models;
+using EVChargingSystem.WebAPI.Data.Repositories;
 ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,7 +27,7 @@ var databaseName = builder.Configuration.GetValue<string>("EVChargingDatabase:Da
 builder.Services.AddSingleton(new MongoDbContext(connectionString, databaseName));
 
 
-// Register the IUserService and its implementation as a scoped service
+builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IUserService, UserService>();
 
 

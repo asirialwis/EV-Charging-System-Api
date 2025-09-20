@@ -43,7 +43,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("login")]
-    public async Task<IActionResult> Login([FromBody] LoginRequest request)
+    public async Task<IActionResult> Login([FromBody] LoginRequestDto request)
     {
         var user = await _userService.AuthenticateAsync(request.Email, request.Password);
         if (user == null)
@@ -94,16 +94,10 @@ public class AuthController : ControllerBase
             issuer: _config["Jwt:Issuer"],
             audience: _config["Jwt:Audience"],
             claims: claims,
-            expires: DateTime.Now.AddMinutes(30),
+            expires: DateTime.Now.AddDays(3),
             signingCredentials: credentials);
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 }
 
-//DTO for login request
-public class LoginRequest
-{
-    public string Email { get; set; }
-    public string Password { get; set; }
-}
