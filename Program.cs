@@ -33,6 +33,9 @@ builder.Services.AddScoped<IEVOwnerProfileRepository, EVOwnerProfileRepository>(
 
 builder.Services.AddScoped<IUserService, UserService>();
 
+builder.Services.AddScoped<IChargingStationRepository, ChargingStationRepository>();
+builder.Services.AddScoped<IChargingStationService, ChargingStationService>();
+
 // Add JWT Authentication
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
    .AddJwtBearer(options =>
