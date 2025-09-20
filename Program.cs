@@ -9,6 +9,7 @@ using EVChargingSystem.WebAPI.Services;
 using Swashbuckle.AspNetCore.Filters;
 using Microsoft.OpenApi.Models;
 using EVChargingSystem.WebAPI.Data.Repositories;
+using EVChargingApi.Data.Repositories;
 ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,8 +29,9 @@ builder.Services.AddSingleton(new MongoDbContext(connectionString, databaseName)
 
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
-builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IEVOwnerProfileRepository, EVOwnerProfileRepository>();
 
+builder.Services.AddScoped<IUserService, UserService>();
 
 // Add JWT Authentication
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

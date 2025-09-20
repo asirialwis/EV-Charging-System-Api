@@ -24,21 +24,17 @@ public class AuthController : ControllerBase
     [HttpPost("register")]
     public async Task<IActionResult> RegisterEVOwner([FromBody] RegisterUserDto userDto)
     {
-        // requires EV owners to create their own accounts via mobile app
         if (userDto.Role != "EVOwner")
         {
             return BadRequest("Only EV owners can self-register.");
         }
 
-        // Map the DTO to the User entity. The Id is not set here.
-        var user = new User
+        var success = await _userService.RegisterEVOwnerAsync(userDto);
+        if (!success)
         {
-            Email = userDto.Email,
-            Password = userDto.Password,
-            Role = userDto.Role
-        };
+            return BadRequest("Registration failed. Email or NIC may already be in use.");
+        }
 
-        await _userService.CreateAsync(user);
         return Ok(new { Message = "EV Owner registered successfully." });
     }
 

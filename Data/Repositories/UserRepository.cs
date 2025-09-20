@@ -21,5 +21,11 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
         {
             await _users.InsertOneAsync(user);
         }
+
+        public async Task<User> FindByEmailAsync(string email)
+        {
+            return await _users.Find(u => u.Email == email).FirstOrDefaultAsync();
+        }
+
     }
 }

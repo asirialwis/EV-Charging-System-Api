@@ -7,5 +7,6 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
     {
         Task<User> FindByEmailAndPasswordAsync(string email, string password);
         Task CreateAsync(User user);
+        Task <User>FindByEmailAsync(string email);
     }
 }
