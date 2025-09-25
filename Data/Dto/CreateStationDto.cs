@@ -20,5 +20,6 @@ namespace EVChargingSystem.WebAPI.Data.Dtos
         public required string Longitude { get; set; }
         public string? GooglePlaceID { get; set; }
         public string? AdditionalNotes { get; set; }
+        public string? Status { get; set; } // e.g., "Active", "Inactive", "Under Maintenance"
     }
 }

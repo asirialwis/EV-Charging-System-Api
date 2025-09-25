@@ -34,6 +34,7 @@ namespace EVChargingSystem.WebAPI.Services
                 Longitude = stationDto.Longitude,
                 GooglePlaceID = stationDto.GooglePlaceID ?? string.Empty,
                 AdditionalNotes = stationDto.AdditionalNotes ?? string.Empty,
+                Status = stationDto.Status ?? "Active", // Default to "Active" if not provided
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
