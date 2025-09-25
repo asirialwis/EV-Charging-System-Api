@@ -70,7 +70,8 @@ public class AuthController : ControllerBase
             Password = userDto.Password,
             Role = userDto.Role,
             FullName = userDto.FullName,
-            Phone = userDto.Phone
+            Phone = userDto.Phone,
+            AssignedStations = userDto.AssignedStations
         };
 
         await _userService.CreateAsync(user);

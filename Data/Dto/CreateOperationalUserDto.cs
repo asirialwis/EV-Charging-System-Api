@@ -10,5 +10,7 @@ namespace EVChargingSystem.WebAPI.Data.Dtos
 
 
         public string Phone { get; set; }
+
+        public List<string> AssignedStations { get; set; } = new List<string>(); // For Station Operators, link to their station
     }
 }
