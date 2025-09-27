@@ -1,0 +1,29 @@
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Attributes;
+using System;
+
+namespace EVChargingSystem.WebAPI.Data.Models
+{
+    public class Booking
+    {
+        [BsonId]
+        [BsonRepresentation(BsonType.ObjectId)]
+        public string Id { get; set; }
+
+        [BsonRepresentation(BsonType.ObjectId)]
+        public ObjectId EVOwnerId { get; set; } // The user making the booking
+
+        [BsonRepresentation(BsonType.ObjectId)]
+        public ObjectId StationId { get; set; } // The station being booked
+
+        public string SlotType { get; set; } // "AC" or "DC" - using string for clarity
+        
+        // Use DateTime for precise booking management and consistency
+        public DateTime StartTime { get; set; } 
+        public DateTime EndTime { get; set; }
+        
+        public string Status { get; set; } // e.g., "Pending", "Approved", "Canceled", "Completed"
+        public DateTime BookingDate { get; set; }
+        public DateTime CreatedAt { get; set; }
+    }
+}
