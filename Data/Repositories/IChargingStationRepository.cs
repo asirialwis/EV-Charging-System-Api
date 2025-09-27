@@ -1,4 +1,5 @@
 using EVChargingSystem.WebAPI.Data.Models;
+using MongoDB.Bson;
 using System.Threading.Tasks;
 
 namespace EVChargingSystem.WebAPI.Data.Repositories
@@ -6,5 +7,7 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
     public interface IChargingStationRepository
     {
         Task CreateAsync(ChargingStation station);
+
+        Task<ChargingStation> FindByIdAsync(ObjectId stationId); 
     }
 }
