@@ -1,9 +1,11 @@
 using EVChargingSystem.WebAPI.Data.Dtos;
 using EVChargingSystem.WebAPI.Data.Models;
 using EVChargingSystem.WebAPI.Data.Repositories;
+using EVChargingSystem.WebAPI.Utils;
 using MongoDB.Bson;
 using System;
 using System.Threading.Tasks;
+
 
 namespace EVChargingSystem.WebAPI.Services
 {
@@ -119,6 +121,60 @@ namespace EVChargingSystem.WebAPI.Services
             // *** MODIFIED LOGIC END ***
 
             return availableSlots;
+        }
+
+
+
+        public async Task<(bool Success, string QrCodeBase64, string Message)> ApproveBookingAsync(string bookingId)
+        {
+            if (!ObjectId.TryParse(bookingId, out var objectId))
+            {
+                return (false, null, "Invalid Booking ID format.");
+            }
+
+            var booking = await _bookingRepository.FindByIdAsync(objectId);
+
+            if (booking == null)
+            {
+                return (false, null, "Booking not found.");
+            }
+            if (booking.Status == "Approved" || booking.Status == "Completed")
+            {
+                return (false, null, "Booking is already approved or completed.");
+            }
+
+            // 1. Generate the QR Code (Payload is the Booking ID)
+            string qrCodePayload = bookingId;
+            string qrCodeBase64 = QRCodeGeneratorUtil.GenerateQRCodeBase64(qrCodePayload);
+
+            // 2. Update status to 'Approved' and save the QR code to the document
+            var success = await _bookingRepository.UpdateBookingAndQrCodeAsync(
+                objectId,
+                "Approved",
+                qrCodeBase64
+            );
+
+            if (success)
+            {
+                return (true, qrCodeBase64, "Booking approved and QR code generated.");
+            }
+            else
+            {
+                return (false, null, "Failed to update booking status and QR code.");
+            }
+        }
+
+        // Method for the Operator to look up details
+        public async Task<Booking> GetBookingDetails(ObjectId bookingId)
+        {
+            return await _bookingRepository.FindByIdAsync(bookingId);
+        }
+
+        // Method for the Operator to finalize the session
+        public async Task<bool> FinalizeBookingAsync(ObjectId bookingId)
+        {
+            // The operator finalizes the business once EV operation is done
+            return await _bookingRepository.UpdateStatusAsync(bookingId, "Completed");
         }
     }
 }

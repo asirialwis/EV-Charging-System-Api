@@ -20,5 +20,10 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             ObjectId stationId,
             string slotType,
             DateTime date);
+
+
+        Task<Booking> FindByIdAsync(ObjectId bookingId);
+        Task<bool> UpdateStatusAsync(ObjectId bookingId, string newStatus);
+        Task<bool> UpdateBookingAndQrCodeAsync(ObjectId bookingId, string newStatus, string qrCodeBase64);
     }
 }
