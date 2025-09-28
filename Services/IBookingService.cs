@@ -1,4 +1,6 @@
 using EVChargingSystem.WebAPI.Data.Dtos;
+using EVChargingSystem.WebAPI.Data.Models;
+using MongoDB.Bson;
 using System.Data;
 using System.Threading.Tasks;
 
@@ -15,5 +17,12 @@ namespace EVChargingSystem.WebAPI.Services
         Task<bool> CreateBookingAsync(CreateBookingDto bookingDto);
 
         Task<List<string>> GetAvailableSlotsAsync(string stationId, string slotType, DateTime date);
+
+        Task<(bool Success, string QrCodeBase64, string Message)> ApproveBookingAsync(string bookingId);
+
+        Task<Booking> GetBookingDetails(ObjectId bookingId);
+
+        Task<bool> FinalizeBookingAsync(ObjectId bookingId);
+        
     }
 }

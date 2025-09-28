@@ -70,5 +70,43 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
         {
             await _bookings.InsertOneAsync(booking);
         }
+
+
+         public async Task<Booking> FindByIdAsync(ObjectId bookingId)
+        {
+            // Note: MongoDB driver often handles string conversion, but this uses ObjectId for the filter
+            return await _bookings.Find(b => b.Id == bookingId.ToString()).FirstOrDefaultAsync();
+        }
+
+        public async Task<bool> UpdateStatusAsync(ObjectId bookingId, string newStatus)
+        {
+            var filter = Builders<Booking>.Filter.Eq(b => b.Id, bookingId.ToString());
+            
+            // Use the $set operator to update only the Status and the UpdatedAt timestamp
+            var update = Builders<Booking>.Update
+                .Set(b => b.Status, newStatus)
+                .Set(b => b.UpdatedAt, DateTime.UtcNow);
+
+            var result = await _bookings.UpdateOneAsync(filter, update);
+            
+            // Check if one document was matched and modified
+            return result.IsAcknowledged && result.ModifiedCount == 1;
+        }
+
+        public async Task<bool> UpdateBookingAndQrCodeAsync(ObjectId bookingId, string newStatus, string qrCodeBase64)
+        {
+            var filter = Builders<Booking>.Filter.Eq(b => b.Id, bookingId.ToString());
+            
+            // Update the Status, the QrCode string, and the UpdatedAt timestamp
+            var update = Builders<Booking>.Update
+                .Set(b => b.Status, newStatus)
+                .Set(b => b.QrCodeBase64, qrCodeBase64) // Requires QrCodeBase64 field in  Booking model
+                .Set(b => b.UpdatedAt, DateTime.UtcNow);
+
+            var result = await _bookings.UpdateOneAsync(filter, update);
+            
+            return result.IsAcknowledged && result.ModifiedCount == 1;
+        }
+
     }
 }
