@@ -35,7 +35,7 @@ public class EVOwnersController : ControllerBase
         if (!success) 
         {
             // Provides a generic error to prevent revealing if the NIC exists but access was denied
-            return Unauthorized("Update failed. You are not authorized to modify this profile.");
+            return Unauthorized("Update failed. You are not authorized to do this modification.");
         }
         return Ok(new { Message = "EV Owner profile updated." });
     }

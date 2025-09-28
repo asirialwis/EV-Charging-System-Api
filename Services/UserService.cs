@@ -74,86 +74,105 @@ namespace EVChargingSystem.WebAPI.Services
             return true;
         }
 
-        public async Task<bool> UpdateEVOwnerAsync(string nic, UpdateEVOwnerDto updateDto, string requestingUserId, string userRole)
+        public async Task<bool> UpdateEVOwnerAsync(
+           string nic,
+           UpdateEVOwnerDto updateDto,
+           string requestingUserId,
+           string userRole)
         {
             var profile = await _profileRepository.FindByNicAsync(nic);
             if (profile == null) return false;
 
-            // --- 1. Role-Based Access Check ---
-            // (This logic remains the same to enforce authorization)
+            // --- 1. Role-Based Access Check (Authorization) ---
+
+            // Check if the requesting user is the profile owner or a Backoffice admin
             if (userRole == "EVOwner")
             {
+                // EVOwner can only update their own profile (ownership check)
                 if (profile.UserId.ToString() != requestingUserId) return false;
             }
             else if (userRole != "Backoffice")
             {
+                // Only Backoffice or the EVOwner can perform this API call
                 return false;
             }
+            // Backoffice users are authorized to proceed.
+
 
             // --- 2. Dynamic PATCH Builder Logic ---
             var updateBuilder = Builders<EVOwnerProfile>.Update;
             var updates = new List<UpdateDefinition<EVOwnerProfile>>();
 
-            // Use reflection or explicit checks to add only non-null properties to the update list
+            // --- Profile Field Updates (Allowed for both Owner and Backoffice) ---
             if (updateDto.FullName != null)
             {
                 updates.Add(updateBuilder.Set(p => p.FullName, updateDto.FullName));
             }
-            if (updateDto.Phone != null)
-            {
-                updates.Add(updateBuilder.Set(p => p.Phone, updateDto.Phone));
-            }
-            if (updateDto.Address != null)
-            {
-                updates.Add(updateBuilder.Set(p => p.Address, updateDto.Address));
-            }
-            if (updateDto.VehicleModel != null)
-            {
-                updates.Add(updateBuilder.Set(p => p.VehicleModel, updateDto.VehicleModel));
-            }
-            if (updateDto.LicensePlate != null)
-            {
-                updates.Add(updateBuilder.Set(p => p.LicensePlate, updateDto.LicensePlate));
-            }
+            // ... (Add all other profile fields here: Phone, Address, VehicleModel, LicensePlate) ...
+            if (updateDto.Phone != null) updates.Add(updateBuilder.Set(p => p.Phone, updateDto.Phone));
+            if (updateDto.Address != null) updates.Add(updateBuilder.Set(p => p.Address, updateDto.Address));
+            if (updateDto.VehicleModel != null) updates.Add(updateBuilder.Set(p => p.VehicleModel, updateDto.VehicleModel));
+            if (updateDto.LicensePlate != null) updates.Add(updateBuilder.Set(p => p.LicensePlate, updateDto.LicensePlate));
 
-            // ---Status Update Logic (Backoffice Only) ---
+
+            // --- 3. Status Update Logic (Handles Complex Rules) ---
             if (updateDto.Status != null)
             {
+                string newStatus = updateDto.Status;
+                string currentStatus = profile.Status;
+
                 // A. Strict Validation of Status Value
-                if (updateDto.Status != "Active" && updateDto.Status != "Deactivated")
+                if (newStatus != "Active" && newStatus != "Deactivated")
                 {
                     return false; // Invalid status value provided
                 }
 
-                // B. Role Enforcement: Only Backoffice can change status
-                if (userRole != "Backoffice")
+                // B. Enforce Reactivation Rule: Only Backoffice can set status to "Active"
+                if (newStatus == "Active")
                 {
-                    // Fail the entire operation if a non-Backoffice user tries to change Status
-                    return false;
+                    if (userRole != "Backoffice")
+                    {
+                        // Deactivated accounts can only be reactivated by a back-office officer
+                        return false;
+                    }
                 }
 
-                // C. Add the status update to the MongoDB update list
-                updates.Add(updateBuilder.Set(p => p.Status, updateDto.Status));
+                // C. Enforce Deactivation Rule: Owner can set status to "Deactivated"
 
-                // FUTURE STEP: When deactivating, the corresponding 'User' document should 
-                // also be updated (e.g., set a 'CanLogin' flag or change their role/status) 
-                // to prevent them from logging in via the AuthController.
+
+                // D. Add the status update to the MongoDB update list
+                updates.Add(updateBuilder.Set(p => p.Status, newStatus));
+
+                // // E. Cascade Update Logic (CRITICAL SECURITY STEP)
+                // // Update the corresponding User document to enable/disable login.
+                // var userUpdateSuccess = await _userRepository.UpdateStatusAsync(
+                //     profile.UserId.ToString(), 
+                //     newStatus
+                // );
+
+                // if (!userUpdateSuccess)
+                // {
+                //     // Fail the transaction if the critical login status update fails
+                //     return false; 
+                // }
             }
 
+
+            // --- 4. Final Execution ---
 
             // Always update the UpdateAt timestamp
             updates.Add(updateBuilder.Set(p => p.UpdatedAt, DateTime.UtcNow));
 
-            // Check if any fields were actually updated
+            // Check if any profile fields were actually modified
             if (updates.Count == 0)
             {
-                return true; // No data to update, but the operation is considered successful
+                return true; // No data to update (just a check), operation is successful
             }
 
             // Combine all individual updates into one atomic operation
             var combinedUpdate = updateBuilder.Combine(updates);
 
-            // 3. Save to repository using the new PartialUpdateAsync
+            // 5. Save to repository using the new PartialUpdateAsync
             return await _profileRepository.PartialUpdateAsync(nic, combinedUpdate);
         }
     }
