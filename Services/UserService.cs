@@ -3,12 +3,14 @@ using EVChargingSystem.WebAPI.Data.Repositories;
 using EVChargingApi.Data.Models;
 using EVChargingApi.Dto;
 using EVChargingApi.Data.Repositories;
+using EVChargingSystem.WebAPI.Data.Dtos;
+using MongoDB.Driver;
 
 namespace EVChargingSystem.WebAPI.Services
 {
     public class UserService : IUserService
     {
-        
+
         private readonly IUserRepository _userRepository;
         private readonly IEVOwnerProfileRepository _profileRepository;
 
@@ -70,6 +72,89 @@ namespace EVChargingSystem.WebAPI.Services
             await _profileRepository.CreateAsync(profile);
 
             return true;
+        }
+
+        public async Task<bool> UpdateEVOwnerAsync(string nic, UpdateEVOwnerDto updateDto, string requestingUserId, string userRole)
+        {
+            var profile = await _profileRepository.FindByNicAsync(nic);
+            if (profile == null) return false;
+
+            // --- 1. Role-Based Access Check ---
+            // (This logic remains the same to enforce authorization)
+            if (userRole == "EVOwner")
+            {
+                if (profile.UserId.ToString() != requestingUserId) return false;
+            }
+            else if (userRole != "Backoffice")
+            {
+                return false;
+            }
+
+            // --- 2. Dynamic PATCH Builder Logic ---
+            var updateBuilder = Builders<EVOwnerProfile>.Update;
+            var updates = new List<UpdateDefinition<EVOwnerProfile>>();
+
+            // Use reflection or explicit checks to add only non-null properties to the update list
+            if (updateDto.FullName != null)
+            {
+                updates.Add(updateBuilder.Set(p => p.FullName, updateDto.FullName));
+            }
+            if (updateDto.Phone != null)
+            {
+                updates.Add(updateBuilder.Set(p => p.Phone, updateDto.Phone));
+            }
+            if (updateDto.Address != null)
+            {
+                updates.Add(updateBuilder.Set(p => p.Address, updateDto.Address));
+            }
+            if (updateDto.VehicleModel != null)
+            {
+                updates.Add(updateBuilder.Set(p => p.VehicleModel, updateDto.VehicleModel));
+            }
+            if (updateDto.LicensePlate != null)
+            {
+                updates.Add(updateBuilder.Set(p => p.LicensePlate, updateDto.LicensePlate));
+            }
+
+            // ---Status Update Logic (Backoffice Only) ---
+            if (updateDto.Status != null)
+            {
+                // A. Strict Validation of Status Value
+                if (updateDto.Status != "Active" && updateDto.Status != "Deactivated")
+                {
+                    return false; // Invalid status value provided
+                }
+
+                // B. Role Enforcement: Only Backoffice can change status
+                if (userRole != "Backoffice")
+                {
+                    // Fail the entire operation if a non-Backoffice user tries to change Status
+                    return false;
+                }
+
+                // C. Add the status update to the MongoDB update list
+                updates.Add(updateBuilder.Set(p => p.Status, updateDto.Status));
+
+                // FUTURE STEP: When deactivating, the corresponding 'User' document should 
+                // also be updated (e.g., set a 'CanLogin' flag or change their role/status) 
+                // to prevent them from logging in via the AuthController.
+            }
+
+
+            // Always update the UpdateAt timestamp
+            updates.Add(updateBuilder.Set(p => p.UpdatedAt, DateTime.UtcNow));
+
+            // Check if any fields were actually updated
+            if (updates.Count == 0)
+            {
+                return true; // No data to update, but the operation is considered successful
+            }
+
+            // Combine all individual updates into one atomic operation
+            var combinedUpdate = updateBuilder.Combine(updates);
+
+            // 3. Save to repository using the new PartialUpdateAsync
+            return await _profileRepository.PartialUpdateAsync(nic, combinedUpdate);
         }
     }
 }

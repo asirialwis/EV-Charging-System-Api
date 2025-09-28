@@ -1,5 +1,6 @@
 using EVChargingApi.Data.Models;
 using EVChargingApi.Dto;
+using EVChargingSystem.WebAPI.Data.Dtos;
 
 namespace EVChargingApi.Services
 {
@@ -9,6 +10,8 @@ namespace EVChargingApi.Services
         Task CreateAsync(User user);
 
         Task<bool> RegisterEVOwnerAsync(RegisterUserDto userDto);
+
+        Task<bool> UpdateEVOwnerAsync(string nic, UpdateEVOwnerDto updateDto, string requestingUserId, string userRole);
 
     }
 }
