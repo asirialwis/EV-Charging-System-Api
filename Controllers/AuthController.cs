@@ -42,13 +42,19 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequestDto request)
     {
-        var user = await _userService.AuthenticateAsync(request.Email, request.Password);
+        // Deconstruct the Tuple result
+        var (user, errorMessage) = await _userService.AuthenticateAsync(request.Email, request.Password);
+
+        // Check if the service returned an error (User is null)
         if (user == null)
         {
-            return Unauthorized("Invalid credentials.");
+            // Return 401 Unauthorized with the specific error message
+            // If credentials failed, errorMessage is "Invalid email or password."
+            // If deactivated, errorMessage is "Account is currently deactivated..."
+            return Unauthorized(errorMessage);
         }
 
-        // Generate JWT Token
+        // Authentication successful
         var token = GenerateJwtToken(user);
         return Ok(new { Token = token, Role = user.Role });
     }

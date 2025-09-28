@@ -20,11 +20,30 @@ namespace EVChargingSystem.WebAPI.Services
             _profileRepository = profileRepository;
         }
 
-        public async Task<User> AuthenticateAsync(string email, string password)
+        public async Task<(User? User, string? ErrorMessage)> AuthenticateAsync(string email, string password)
         {
-            //service uses the repository method
             var user = await _userRepository.FindByEmailAndPasswordAsync(email, password);
-            return user;
+
+            // Check 1: Invalid Credentials (Credentials failed)
+            if (user == null)
+            {
+                return (null, "Invalid email or password.");
+            }
+
+            // Check 2: CRITICAL SECURITY CHECK (Account Status)
+            if (user.Status == "Deactivated")
+            {
+                // Return null User and the specific error message
+                return (null, "Account is currently deactivated. Please contact backoffice support.");
+            }
+
+            // 3. Authentication successful
+            return (user, null);
+        }
+
+        private User BadRequest(string v)
+        {
+            throw new NotImplementedException();
         }
 
         public async Task CreateAsync(User user)
@@ -143,18 +162,18 @@ namespace EVChargingSystem.WebAPI.Services
                 // D. Add the status update to the MongoDB update list
                 updates.Add(updateBuilder.Set(p => p.Status, newStatus));
 
-                // // E. Cascade Update Logic (CRITICAL SECURITY STEP)
-                // // Update the corresponding User document to enable/disable login.
-                // var userUpdateSuccess = await _userRepository.UpdateStatusAsync(
-                //     profile.UserId.ToString(), 
-                //     newStatus
-                // );
+                // E. Cascade Update Logic (CRITICAL SECURITY STEP)
+                // Update the corresponding User document to enable/disable login.
+                var userUpdateSuccess = await _userRepository.UpdateStatusAsync(
+                    profile.UserId.ToString(),
+                    newStatus
+                );
 
-                // if (!userUpdateSuccess)
-                // {
-                //     // Fail the transaction if the critical login status update fails
-                //     return false; 
-                // }
+                if (!userUpdateSuccess)
+                {
+                    // Fail the transaction if the critical login status update fails
+                    return false;
+                }
             }
 
 
