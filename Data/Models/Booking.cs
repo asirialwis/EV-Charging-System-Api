@@ -17,13 +17,18 @@ namespace EVChargingSystem.WebAPI.Data.Models
         public ObjectId StationId { get; set; } // The station being booked
 
         public string SlotType { get; set; } // "AC" or "DC" - using string for clarity
-        
+
         // Use DateTime for precise booking management and consistency
-        public DateTime StartTime { get; set; } 
+        public DateTime StartTime { get; set; }
         public DateTime EndTime { get; set; }
-        
+
         public string Status { get; set; } // e.g., "Pending", "Approved", "Canceled", "Completed"
+
+         public string QrCodeBase64 { get; set; }
+         
         public DateTime BookingDate { get; set; }
         public DateTime CreatedAt { get; set; }
+        
+         public DateTime UpdatedAt { get; set; }
     }
 }
