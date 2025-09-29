@@ -22,5 +22,14 @@ namespace EVChargingApi.Data.Repositories
         {
             await _profiles.InsertOneAsync(profile);
         }
+        public async Task<bool> PartialUpdateAsync(string nic, UpdateDefinition<EVOwnerProfile> updateDefinition)
+        {
+            var filter = Builders<EVOwnerProfile>.Filter.Eq(p => p.Nic, nic);
+
+            // UpdateOneAsync performs the partial update
+            var result = await _profiles.UpdateOneAsync(filter, updateDefinition);
+
+            return result.ModifiedCount == 1;
+        }
     }
 }

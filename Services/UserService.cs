@@ -3,12 +3,14 @@ using EVChargingSystem.WebAPI.Data.Repositories;
 using EVChargingApi.Data.Models;
 using EVChargingApi.Dto;
 using EVChargingApi.Data.Repositories;
+using EVChargingSystem.WebAPI.Data.Dtos;
+using MongoDB.Driver;
 
 namespace EVChargingSystem.WebAPI.Services
 {
     public class UserService : IUserService
     {
-        
+
         private readonly IUserRepository _userRepository;
         private readonly IEVOwnerProfileRepository _profileRepository;
 
@@ -18,11 +20,30 @@ namespace EVChargingSystem.WebAPI.Services
             _profileRepository = profileRepository;
         }
 
-        public async Task<User> AuthenticateAsync(string email, string password)
+        public async Task<(User? User, string? ErrorMessage)> AuthenticateAsync(string email, string password)
         {
-            //service uses the repository method
             var user = await _userRepository.FindByEmailAndPasswordAsync(email, password);
-            return user;
+
+            // Check 1: Invalid Credentials (Credentials failed)
+            if (user == null)
+            {
+                return (null, "Invalid email or password.");
+            }
+
+            // Check 2: CRITICAL SECURITY CHECK (Account Status)
+            if (user.Status == "Deactivated")
+            {
+                // Return null User and the specific error message
+                return (null, "Account is currently deactivated. Please contact backoffice support.");
+            }
+
+            // 3. Authentication successful
+            return (user, null);
+        }
+
+        private User BadRequest(string v)
+        {
+            throw new NotImplementedException();
         }
 
         public async Task CreateAsync(User user)
@@ -70,6 +91,108 @@ namespace EVChargingSystem.WebAPI.Services
             await _profileRepository.CreateAsync(profile);
 
             return true;
+        }
+
+        public async Task<bool> UpdateEVOwnerAsync(
+           string nic,
+           UpdateEVOwnerDto updateDto,
+           string requestingUserId,
+           string userRole)
+        {
+            var profile = await _profileRepository.FindByNicAsync(nic);
+            if (profile == null) return false;
+
+            // --- 1. Role-Based Access Check (Authorization) ---
+
+            // Check if the requesting user is the profile owner or a Backoffice admin
+            if (userRole == "EVOwner")
+            {
+                // EVOwner can only update their own profile (ownership check)
+                if (profile.UserId.ToString() != requestingUserId) return false;
+            }
+            else if (userRole != "Backoffice")
+            {
+                // Only Backoffice or the EVOwner can perform this API call
+                return false;
+            }
+            // Backoffice users are authorized to proceed.
+
+
+            // --- 2. Dynamic PATCH Builder Logic ---
+            var updateBuilder = Builders<EVOwnerProfile>.Update;
+            var updates = new List<UpdateDefinition<EVOwnerProfile>>();
+
+            // --- Profile Field Updates (Allowed for both Owner and Backoffice) ---
+            if (updateDto.FullName != null)
+            {
+                updates.Add(updateBuilder.Set(p => p.FullName, updateDto.FullName));
+            }
+            // ... (Add all other profile fields here: Phone, Address, VehicleModel, LicensePlate) ...
+            if (updateDto.Phone != null) updates.Add(updateBuilder.Set(p => p.Phone, updateDto.Phone));
+            if (updateDto.Address != null) updates.Add(updateBuilder.Set(p => p.Address, updateDto.Address));
+            if (updateDto.VehicleModel != null) updates.Add(updateBuilder.Set(p => p.VehicleModel, updateDto.VehicleModel));
+            if (updateDto.LicensePlate != null) updates.Add(updateBuilder.Set(p => p.LicensePlate, updateDto.LicensePlate));
+
+
+            // --- 3. Status Update Logic (Handles Complex Rules) ---
+            if (updateDto.Status != null)
+            {
+                string newStatus = updateDto.Status;
+                string currentStatus = profile.Status;
+
+                // A. Strict Validation of Status Value
+                if (newStatus != "Active" && newStatus != "Deactivated")
+                {
+                    return false; // Invalid status value provided
+                }
+
+                // B. Enforce Reactivation Rule: Only Backoffice can set status to "Active"
+                if (newStatus == "Active")
+                {
+                    if (userRole != "Backoffice")
+                    {
+                        // Deactivated accounts can only be reactivated by a back-office officer
+                        return false;
+                    }
+                }
+
+                // C. Enforce Deactivation Rule: Owner can set status to "Deactivated"
+
+
+                // D. Add the status update to the MongoDB update list
+                updates.Add(updateBuilder.Set(p => p.Status, newStatus));
+
+                // E. Cascade Update Logic (CRITICAL SECURITY STEP)
+                // Update the corresponding User document to enable/disable login.
+                var userUpdateSuccess = await _userRepository.UpdateStatusAsync(
+                    profile.UserId.ToString(),
+                    newStatus
+                );
+
+                if (!userUpdateSuccess)
+                {
+                    // Fail the transaction if the critical login status update fails
+                    return false;
+                }
+            }
+
+
+            // --- 4. Final Execution ---
+
+            // Always update the UpdateAt timestamp
+            updates.Add(updateBuilder.Set(p => p.UpdatedAt, DateTime.UtcNow));
+
+            // Check if any profile fields were actually modified
+            if (updates.Count == 0)
+            {
+                return true; // No data to update (just a check), operation is successful
+            }
+
+            // Combine all individual updates into one atomic operation
+            var combinedUpdate = updateBuilder.Combine(updates);
+
+            // 5. Save to repository using the new PartialUpdateAsync
+            return await _profileRepository.PartialUpdateAsync(nic, combinedUpdate);
         }
     }
 }
