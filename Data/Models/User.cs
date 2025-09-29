@@ -20,5 +20,9 @@ namespace EVChargingApi.Data.Models
 
         [BsonRepresentation(BsonType.ObjectId)]
         public List<string> AssignedStations { get; set; } = new List<string>(); // For Station Operators, link to their station
+
+        public string Status { get; set; } 
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
     }
 }
