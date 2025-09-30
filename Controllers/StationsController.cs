@@ -30,4 +30,12 @@ public class StationsController : ControllerBase
         var operators = await _stationService.GetUnassignedOperatorsAsync();
         return Ok(operators);
     }
+
+    [HttpGet("stations/all-for-assignment")]
+    [Authorize(Roles = "Backoffice")]
+    public async Task<IActionResult> GetAllStationsForAssignment()
+    {
+        var stations = await _stationService.GetAllStationsForAssignmentAsync();
+        return Ok(stations);
+    }
 }

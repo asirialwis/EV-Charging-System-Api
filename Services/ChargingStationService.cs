@@ -15,7 +15,7 @@ namespace EVChargingSystem.WebAPI.Services
             _stationRepository = stationRepository;
             _userRepository = userRepository;
         }
-       
+
 
         public async Task CreateStationAsync(CreateStationDto stationDto)
         {
@@ -63,12 +63,31 @@ namespace EVChargingSystem.WebAPI.Services
                 .Select(op => new OperatorDto
                 {
                     Id = op.Id,
-                    Email = op.Email, 
+                    Email = op.Email,
                     FullName = op.FullName
                 })
                 .ToList();
 
             return unassignedOperators;
+        }
+        
+
+        public async Task<List<StationAssignmentDto>> GetAllStationsForAssignmentAsync()
+        {
+            // 1. Fetch ALL stations (requires GetAllStationsAsync in IChargingStationRepository)
+            var allStations = await _stationRepository.GetAllStationsAsync();
+            
+            // 2. Map to the light DTO for the UI
+            var assignmentList = allStations
+                .Select(s => new StationAssignmentDto
+                {
+                    Id = s.Id,
+                    StationName = s.StationName,
+                    StationCode = s.StationCode
+                })
+                .ToList();
+
+            return assignmentList;
         }
     }
 }

@@ -48,5 +48,11 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
                 })
                 .ToList();
         }
+
+        public async Task<List<ChargingStation>> GetAllStationsAsync()
+        {
+            // Implementation to find ALL documents
+            return await _stations.Find(_ => true).ToListAsync();
+        }
     }
 }

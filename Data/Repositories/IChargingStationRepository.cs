@@ -8,8 +8,10 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
     {
         Task CreateAsync(ChargingStation station);
 
-        Task<ChargingStation> FindByIdAsync(ObjectId stationId); 
+        Task<ChargingStation> FindByIdAsync(ObjectId stationId);
 
         Task<List<string>> GetAllAssignedOperatorIdsAsync();
+        
+        Task<List<ChargingStation>> GetAllStationsAsync();
     }
 }
