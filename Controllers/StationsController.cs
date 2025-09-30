@@ -22,4 +22,12 @@ public class StationsController : ControllerBase
         await _stationService.CreateStationAsync(stationDto);
         return Ok(new { Message = "Charging station created successfully." });
     }
+
+    [HttpGet("unassigned-operators")]
+    [Authorize(Roles = "Backoffice")]
+    public async Task<IActionResult> GetUnassignedOperators()
+    {
+        var operators = await _stationService.GetUnassignedOperatorsAsync();
+        return Ok(operators);
+    }
 }

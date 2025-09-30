@@ -8,11 +8,14 @@ namespace EVChargingSystem.WebAPI.Services
     public class ChargingStationService : IChargingStationService
     {
         private readonly IChargingStationRepository _stationRepository;
+        private readonly IUserRepository _userRepository;
 
-        public ChargingStationService(IChargingStationRepository stationRepository)
+        public ChargingStationService(IChargingStationRepository stationRepository, IUserRepository userRepository)
         {
             _stationRepository = stationRepository;
+            _userRepository = userRepository;
         }
+       
 
         public async Task CreateStationAsync(CreateStationDto stationDto)
         {
@@ -38,8 +41,34 @@ namespace EVChargingSystem.WebAPI.Services
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
-            
+
             await _stationRepository.CreateAsync(station);
+        }
+
+
+        public async Task<List<OperatorDto>> GetUnassignedOperatorsAsync()
+        {
+            // 1. Get all active Station Operators
+            var allOperators = await _userRepository.GetUsersByRoleAsync("StationOperator");
+
+            // 2. Get all assigned Operator IDs from the Stations collection
+            var assignedIds = await _stationRepository.GetAllAssignedOperatorIdsAsync();
+
+            // Convert assignedIds to a HashSet for fast lookup
+            var assignedIdSet = new HashSet<string>(assignedIds);
+
+            // 3. Filter in C# memory
+            var unassignedOperators = allOperators
+                .Where(op => !assignedIdSet.Contains(op.Id))
+                .Select(op => new OperatorDto
+                {
+                    Id = op.Id,
+                    Email = op.Email, 
+                    FullName = op.FullName
+                })
+                .ToList();
+
+            return unassignedOperators;
         }
     }
 }
