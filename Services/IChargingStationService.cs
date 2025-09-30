@@ -6,5 +6,7 @@ namespace EVChargingSystem.WebAPI.Services
     public interface IChargingStationService
     {
         Task CreateStationAsync(CreateStationDto stationDto);
+
+        Task<List<OperatorDto>> GetUnassignedOperatorsAsync();
     }
 }

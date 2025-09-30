@@ -25,5 +25,28 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             // Implementation to find the station by its ObjectId
             return await _stations.Find(s => s.Id == stationId.ToString()).FirstOrDefaultAsync();
         }
+
+        public async Task<List<string>> GetAllAssignedOperatorIdsAsync()
+        {
+            // Projection to include only the StationOperatorId field
+            var projection = Builders<ChargingStation>.Projection.Include(s => s.StationOperatorId);
+
+            var assignedDocs = await _stations
+                .Find(_ => true) // Find all stations
+                .Project<BsonDocument>(projection)
+                .ToListAsync();
+
+            //  MAPPING LOGIC:
+            return assignedDocs
+                .Where(doc => doc.Contains("StationOperatorId"))
+                .Select(doc =>
+                {
+                    // 1. Get the value as a BsonObjectId
+                    var objectId = doc["StationOperatorId"].AsObjectId;
+                    // 2. Convert the ObjectId instance to a string
+                    return objectId.ToString();
+                })
+                .ToList();
+        }
     }
 }
