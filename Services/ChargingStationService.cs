@@ -63,7 +63,7 @@ namespace EVChargingSystem.WebAPI.Services
                 .Select(op => new OperatorDto
                 {
                     Id = op.Id,
-                    Email = op.Email, // Assuming Email is the unique identifier/login name
+                    Email = op.Email, 
                     FullName = op.FullName
                 })
                 .ToList();
