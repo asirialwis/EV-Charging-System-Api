@@ -25,5 +25,7 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
         Task<Booking> FindByIdAsync(ObjectId bookingId);
         Task<bool> UpdateStatusAsync(ObjectId bookingId, string newStatus);
         Task<bool> UpdateBookingAndQrCodeAsync(ObjectId bookingId, string newStatus, string qrCodeBase64);
+
+         Task<bool> HasActiveBookingsForStationAsync(ObjectId stationId);
     }
 }
