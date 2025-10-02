@@ -22,12 +22,18 @@ namespace EVChargingSystem.WebAPI.Services
 
         public async Task CreateStationAsync(CreateStationDto stationDto)
         {
+            var acSlotCount = stationDto.ACChargingSlots ?? 0;
+            var dcSlotCount = stationDto.DCChargingSlots ?? 0;
+            
             var station = new ChargingStation
             {
                 StationName = stationDto.StationName,
                 StationCode = stationDto.StationCode ?? string.Empty,
-                ACChargingSlots = stationDto.ACChargingSlots ?? 0,
-                DCChargingSlots = stationDto.DCChargingSlots ?? 0,
+                ACChargingSlots = acSlotCount,
+                DCChargingSlots = dcSlotCount,
+                // Generate slot ID arrays based on slot counts
+                ACSlots = GenerateACSlotArray(acSlotCount),
+                DCSlots = GenerateDCSlotArray(dcSlotCount),
                 ACPowerOutput = stationDto.ACPowerOutput,
                 ACConnector = stationDto.ACConnector ?? string.Empty,
                 ACChargingTime = stationDto.ACChargingTime,
@@ -46,6 +52,19 @@ namespace EVChargingSystem.WebAPI.Services
             };
 
             await _stationRepository.CreateAsync(station);
+        }
+
+        // Helper methods to generate slot ID arrays
+        private List<string> GenerateACSlotArray(int count)
+        {
+            if (count <= 0) return new List<string>();
+            return Enumerable.Range(1, count).Select(i => $"A{i}").ToList();
+        }
+
+        private List<string> GenerateDCSlotArray(int count)
+        {
+            if (count <= 0) return new List<string>();
+            return Enumerable.Range(1, count).Select(i => $"D{i}").ToList();
         }
 
 
@@ -124,8 +143,18 @@ namespace EVChargingSystem.WebAPI.Services
             if (updateDto.Status != null) updates.Add(updateBuilder.Set(s => s.Status, updateDto.Status));
 
             // Numeric fields must check if they have a value (e.g., != null)
-            if (updateDto.ACChargingSlots.HasValue) updates.Add(updateBuilder.Set(s => s.ACChargingSlots, updateDto.ACChargingSlots.Value));
-            if (updateDto.DCChargingSlots.HasValue) updates.Add(updateBuilder.Set(s => s.DCChargingSlots, updateDto.DCChargingSlots.Value));
+            if (updateDto.ACChargingSlots.HasValue)
+            {
+                updates.Add(updateBuilder.Set(s => s.ACChargingSlots, updateDto.ACChargingSlots.Value));
+                // Regenerate AC slot array when count changes
+                updates.Add(updateBuilder.Set(s => s.ACSlots, GenerateACSlotArray(updateDto.ACChargingSlots.Value)));
+            }
+            if (updateDto.DCChargingSlots.HasValue)
+            {
+                updates.Add(updateBuilder.Set(s => s.DCChargingSlots, updateDto.DCChargingSlots.Value));
+                // Regenerate DC slot array when count changes
+                updates.Add(updateBuilder.Set(s => s.DCSlots, GenerateDCSlotArray(updateDto.DCChargingSlots.Value)));
+            }
             if (updateDto.TotalCapacity.HasValue) updates.Add(updateBuilder.Set(s => s.TotalCapacity, updateDto.TotalCapacity.Value));
 
             // String fields
