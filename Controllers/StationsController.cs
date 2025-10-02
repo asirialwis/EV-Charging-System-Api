@@ -30,4 +30,29 @@ public class StationsController : ControllerBase
         var operators = await _stationService.GetUnassignedOperatorsAsync();
         return Ok(operators);
     }
+
+    [HttpGet("stations/all-for-assignment")]
+    [Authorize(Roles = "Backoffice")]
+    public async Task<IActionResult> GetAllStationsForAssignment()
+    {
+        var stations = await _stationService.GetAllStationsForAssignmentAsync();
+        return Ok(stations);
+    }
+
+
+
+    [HttpPatch("{id}")] // Use PATCH for partial updates
+    [Authorize(Roles = "Backoffice")] // Only Backoffice can manage station details
+    public async Task<IActionResult> UpdateChargingStation(string id, [FromBody] UpdateStationDto updateDto)
+    {
+        var success = await _stationService.UpdateStationAsync(id, updateDto);
+
+        if (!success)
+        {
+            // If the update fails, it could be due to invalid ID, or the active booking restriction
+            return BadRequest("Update failed. Station ID is invalid or active bookings exist (cannot deactivate).");
+        }
+
+        return Ok(new { Message = "Charging station details updated successfully." });
+    }
 }

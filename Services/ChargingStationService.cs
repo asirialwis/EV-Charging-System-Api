@@ -2,6 +2,7 @@ using EVChargingSystem.WebAPI.Data.Dtos;
 using EVChargingSystem.WebAPI.Data.Models;
 using EVChargingSystem.WebAPI.Data.Repositories;
 using MongoDB.Bson;
+using MongoDB.Driver;
 
 namespace EVChargingSystem.WebAPI.Services
 {
@@ -9,13 +10,15 @@ namespace EVChargingSystem.WebAPI.Services
     {
         private readonly IChargingStationRepository _stationRepository;
         private readonly IUserRepository _userRepository;
+        private readonly IBookingRepository _bookingRepository; // For booking checks during deactivation`
 
-        public ChargingStationService(IChargingStationRepository stationRepository, IUserRepository userRepository)
+        public ChargingStationService(IChargingStationRepository stationRepository, IUserRepository userRepository, IBookingRepository bookingRepository)
         {
             _stationRepository = stationRepository;
             _userRepository = userRepository;
+            _bookingRepository = bookingRepository; // For booking checks during deactivation
         }
-       
+
 
         public async Task CreateStationAsync(CreateStationDto stationDto)
         {
@@ -63,12 +66,98 @@ namespace EVChargingSystem.WebAPI.Services
                 .Select(op => new OperatorDto
                 {
                     Id = op.Id,
-                    Email = op.Email, 
+                    Email = op.Email,
                     FullName = op.FullName
                 })
                 .ToList();
 
             return unassignedOperators;
+        }
+
+
+        public async Task<List<StationAssignmentDto>> GetAllStationsForAssignmentAsync()
+        {
+            // 1. Fetch ALL stations (requires GetAllStationsAsync in IChargingStationRepository)
+            var allStations = await _stationRepository.GetAllStationsAsync();
+
+            // 2. Map to the light DTO for the UI
+            var assignmentList = allStations
+                .Select(s => new StationAssignmentDto
+                {
+                    Id = s.Id,
+                    StationName = s.StationName,
+                    StationCode = s.StationCode
+                })
+                .ToList();
+
+            return assignmentList;
+        }
+
+
+
+
+        public async Task<bool> UpdateStationAsync(string stationId, UpdateStationDto updateDto)
+        {
+            if (!ObjectId.TryParse(stationId, out var id)) return false;
+
+            // Check Assignment Requirement: Deactivating stations
+            if (updateDto.Status == "Deactivated")
+            {
+                // MUST add a check here: "cannot deactivate if active bookings exist"
+                // This requires an IBookingRepository method to check for active/pending bookings
+                var hasActiveBookings = await _bookingRepository.HasActiveBookingsForStationAsync(id); // ASSUMED METHOD
+                if (hasActiveBookings)
+                {
+                    // Fail the update if active bookings are found
+                    return false;
+                }
+            }
+
+            // --- Dynamic PATCH Builder Logic ---
+            var updateBuilder = Builders<ChargingStation>.Update;
+            var updates = new List<UpdateDefinition<ChargingStation>>();
+
+            // MAPPING LOGIC: Check for null and add to updates list
+            if (updateDto.StationName != null) updates.Add(updateBuilder.Set(s => s.StationName, updateDto.StationName));
+            if (updateDto.StationCode != null) updates.Add(updateBuilder.Set(s => s.StationCode, updateDto.StationCode));
+            if (updateDto.AdditionalNotes != null) updates.Add(updateBuilder.Set(s => s.AdditionalNotes, updateDto.AdditionalNotes));
+            if (updateDto.Status != null) updates.Add(updateBuilder.Set(s => s.Status, updateDto.Status));
+
+            // Numeric fields must check if they have a value (e.g., != null)
+            if (updateDto.ACChargingSlots.HasValue) updates.Add(updateBuilder.Set(s => s.ACChargingSlots, updateDto.ACChargingSlots.Value));
+            if (updateDto.DCChargingSlots.HasValue) updates.Add(updateBuilder.Set(s => s.DCChargingSlots, updateDto.DCChargingSlots.Value));
+            if (updateDto.TotalCapacity.HasValue) updates.Add(updateBuilder.Set(s => s.TotalCapacity, updateDto.TotalCapacity.Value));
+
+            // String fields
+            if (updateDto.ACPowerOutput != null) updates.Add(updateBuilder.Set(s => s.ACPowerOutput, updateDto.ACPowerOutput));
+            if (updateDto.ACConnector != null) updates.Add(updateBuilder.Set(s => s.ACConnector, updateDto.ACConnector));
+            if (updateDto.ACChargingTime != null) updates.Add(updateBuilder.Set(s => s.ACChargingTime, updateDto.ACChargingTime));
+
+            // Location/Address
+            if (updateDto.AddressLine1 != null) updates.Add(updateBuilder.Set(s => s.AddressLine1, updateDto.AddressLine1));
+            if (updateDto.AddressLine2 != null) updates.Add(updateBuilder.Set(s => s.AddressLine2, updateDto.AddressLine2));
+            if (updateDto.City != null) updates.Add(updateBuilder.Set(s => s.City, updateDto.City));
+            if (updateDto.Latitude != null) updates.Add(updateBuilder.Set(s => s.Latitude, updateDto.Latitude));
+            if (updateDto.Longitude != null) updates.Add(updateBuilder.Set(s => s.Longitude, updateDto.Longitude));
+            if (updateDto.GooglePlaceID != null) updates.Add(updateBuilder.Set(s => s.GooglePlaceID, updateDto.GooglePlaceID));
+
+            // Station Operator Assignment Update (Requires conversion if not null)
+            if (updateDto.StationOperatorId != null)
+            {
+                // NOTE: For many-to-many, this should be an array update. 
+                // Assuming single assignment for now, but converting string to ObjectId
+                updates.Add(updateBuilder.Set(s => s.StationOperatorId, new ObjectId(updateDto.StationOperatorId)));
+            }
+
+
+            // Always update the UpdateAt timestamp
+            updates.Add(updateBuilder.Set(s => s.UpdatedAt, DateTime.Now));
+
+            // Final Check and Execution
+            if (updates.Count == 0) return true; // Nothing to update
+
+            var combinedUpdate = updateBuilder.Combine(updates);
+            return await _stationRepository.PartialUpdateAsync(stationId, combinedUpdate);
         }
     }
 }

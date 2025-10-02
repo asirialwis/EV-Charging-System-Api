@@ -8,5 +8,9 @@ namespace EVChargingSystem.WebAPI.Services
         Task CreateStationAsync(CreateStationDto stationDto);
 
         Task<List<OperatorDto>> GetUnassignedOperatorsAsync();
+
+        Task<List<StationAssignmentDto>> GetAllStationsForAssignmentAsync(); 
+
+        Task<bool> UpdateStationAsync(string stationId, UpdateStationDto updateDto);
     }
 }

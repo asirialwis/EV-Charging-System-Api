@@ -72,7 +72,7 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
         }
 
 
-         public async Task<Booking> FindByIdAsync(ObjectId bookingId)
+        public async Task<Booking> FindByIdAsync(ObjectId bookingId)
         {
             // Note: MongoDB driver often handles string conversion, but this uses ObjectId for the filter
             return await _bookings.Find(b => b.Id == bookingId.ToString()).FirstOrDefaultAsync();
@@ -81,14 +81,14 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
         public async Task<bool> UpdateStatusAsync(ObjectId bookingId, string newStatus)
         {
             var filter = Builders<Booking>.Filter.Eq(b => b.Id, bookingId.ToString());
-            
+
             // Use the $set operator to update only the Status and the UpdatedAt timestamp
             var update = Builders<Booking>.Update
                 .Set(b => b.Status, newStatus)
                 .Set(b => b.UpdatedAt, DateTime.UtcNow);
 
             var result = await _bookings.UpdateOneAsync(filter, update);
-            
+
             // Check if one document was matched and modified
             return result.IsAcknowledged && result.ModifiedCount == 1;
         }
@@ -96,7 +96,7 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
         public async Task<bool> UpdateBookingAndQrCodeAsync(ObjectId bookingId, string newStatus, string qrCodeBase64)
         {
             var filter = Builders<Booking>.Filter.Eq(b => b.Id, bookingId.ToString());
-            
+
             // Update the Status, the QrCode string, and the UpdatedAt timestamp
             var update = Builders<Booking>.Update
                 .Set(b => b.Status, newStatus)
@@ -104,8 +104,25 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
                 .Set(b => b.UpdatedAt, DateTime.UtcNow);
 
             var result = await _bookings.UpdateOneAsync(filter, update);
-            
+
             return result.IsAcknowledged && result.ModifiedCount == 1;
+        }
+        
+         public async Task<bool> HasActiveBookingsForStationAsync(ObjectId stationId)
+        {
+            var filter = Builders<Booking>.Filter.And(
+                // 1. Filter by Station ID
+                Builders<Booking>.Filter.Eq(b => b.StationId, stationId),
+                
+                // 2. Filter by Status: Exclude 'Canceled' and 'Completed'
+                Builders<Booking>.Filter.Ne(b => b.Status, "Canceled"),
+                Builders<Booking>.Filter.Ne(b => b.Status, "Completed")
+            );
+
+            // Use CountDocumentsAsync and check if the count is greater than zero
+            var count = await _bookings.CountDocumentsAsync(filter);
+
+            return count > 0;
         }
 
     }
