@@ -77,7 +77,8 @@ public class AuthController : ControllerBase
             Role = userDto.Role,
             FullName = userDto.FullName,
             Phone = userDto.Phone,
-            AssignedStations = userDto.AssignedStations
+            AssignedStations = userDto.AssignedStations,
+            Status = "Active" // New users are active by default
         };
 
         await _userService.CreateAsync(user);
