@@ -9,8 +9,10 @@ namespace EVChargingSystem.WebAPI.Services
 
         Task<List<OperatorDto>> GetUnassignedOperatorsAsync();
 
-        Task<List<StationAssignmentDto>> GetAllStationsForAssignmentAsync(); 
+        Task<List<StationAssignmentDto>> GetAllStationsForAssignmentAsync();
 
         Task<bool> UpdateStationAsync(string stationId, UpdateStationDto updateDto);
+
+        Task<List<StationWithBookingsDto>> GetStationsWithUpcomingBookingsAsync();
     }
 }

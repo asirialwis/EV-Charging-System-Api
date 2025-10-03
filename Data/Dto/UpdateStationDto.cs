@@ -1,3 +1,5 @@
+using MongoDB.Bson;
+
 namespace EVChargingSystem.WebAPI.Data.Dtos
 {
     public class UpdateStationDto
@@ -17,7 +19,7 @@ namespace EVChargingSystem.WebAPI.Data.Dtos
         public int? TotalCapacity { get; set; }
 
         // Assignment Details (For Many-to-Many updates)
-        public string? StationOperatorId { get; set; } // Will be an array in the future, but kept singular for simplicity now.
+          public List<string> StationOperatorIds { get; set; } = new List<string>();
 
         // Location
         public string? AddressLine1 { get; set; }

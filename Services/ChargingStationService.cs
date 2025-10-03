@@ -22,17 +22,23 @@ namespace EVChargingSystem.WebAPI.Services
 
         public async Task CreateStationAsync(CreateStationDto stationDto)
         {
+            var acSlotCount = stationDto.ACChargingSlots ?? 0;
+            var dcSlotCount = stationDto.DCChargingSlots ?? 0;
+
             var station = new ChargingStation
             {
                 StationName = stationDto.StationName,
                 StationCode = stationDto.StationCode ?? string.Empty,
-                ACChargingSlots = stationDto.ACChargingSlots ?? 0,
-                DCChargingSlots = stationDto.DCChargingSlots ?? 0,
+                ACChargingSlots = acSlotCount,
+                DCChargingSlots = dcSlotCount,
+                // Generate slot ID arrays based on slot counts
+                ACSlots = GenerateACSlotArray(acSlotCount),
+                DCSlots = GenerateDCSlotArray(dcSlotCount),
                 ACPowerOutput = stationDto.ACPowerOutput,
                 ACConnector = stationDto.ACConnector ?? string.Empty,
                 ACChargingTime = stationDto.ACChargingTime,
                 TotalCapacity = stationDto.TotalCapacity ?? 0,
-                StationOperatorId = new ObjectId(stationDto.StationOperatorId),
+                StationOperatorIds = stationDto.StationOperatorIds.Select(id => ObjectId.Parse(id)).ToList(),
                 AddressLine1 = stationDto.AddressLine1,
                 AddressLine2 = stationDto.AddressLine2 ?? string.Empty,
                 City = stationDto.City,
@@ -46,6 +52,19 @@ namespace EVChargingSystem.WebAPI.Services
             };
 
             await _stationRepository.CreateAsync(station);
+        }
+
+        // Helper methods to generate slot ID arrays
+        private List<string> GenerateACSlotArray(int count)
+        {
+            if (count <= 0) return new List<string>();
+            return Enumerable.Range(1, count).Select(i => $"A{i}").ToList();
+        }
+
+        private List<string> GenerateDCSlotArray(int count)
+        {
+            if (count <= 0) return new List<string>();
+            return Enumerable.Range(1, count).Select(i => $"D{i}").ToList();
         }
 
 
@@ -124,8 +143,18 @@ namespace EVChargingSystem.WebAPI.Services
             if (updateDto.Status != null) updates.Add(updateBuilder.Set(s => s.Status, updateDto.Status));
 
             // Numeric fields must check if they have a value (e.g., != null)
-            if (updateDto.ACChargingSlots.HasValue) updates.Add(updateBuilder.Set(s => s.ACChargingSlots, updateDto.ACChargingSlots.Value));
-            if (updateDto.DCChargingSlots.HasValue) updates.Add(updateBuilder.Set(s => s.DCChargingSlots, updateDto.DCChargingSlots.Value));
+            if (updateDto.ACChargingSlots.HasValue)
+            {
+                updates.Add(updateBuilder.Set(s => s.ACChargingSlots, updateDto.ACChargingSlots.Value));
+                // Regenerate AC slot array when count changes
+                updates.Add(updateBuilder.Set(s => s.ACSlots, GenerateACSlotArray(updateDto.ACChargingSlots.Value)));
+            }
+            if (updateDto.DCChargingSlots.HasValue)
+            {
+                updates.Add(updateBuilder.Set(s => s.DCChargingSlots, updateDto.DCChargingSlots.Value));
+                // Regenerate DC slot array when count changes
+                updates.Add(updateBuilder.Set(s => s.DCSlots, GenerateDCSlotArray(updateDto.DCChargingSlots.Value)));
+            }
             if (updateDto.TotalCapacity.HasValue) updates.Add(updateBuilder.Set(s => s.TotalCapacity, updateDto.TotalCapacity.Value));
 
             // String fields
@@ -141,13 +170,15 @@ namespace EVChargingSystem.WebAPI.Services
             if (updateDto.Longitude != null) updates.Add(updateBuilder.Set(s => s.Longitude, updateDto.Longitude));
             if (updateDto.GooglePlaceID != null) updates.Add(updateBuilder.Set(s => s.GooglePlaceID, updateDto.GooglePlaceID));
 
-            // Station Operator Assignment Update (Requires conversion if not null)
-            if (updateDto.StationOperatorId != null)
+            if (updateDto.StationOperatorIds.Any())
             {
-                // NOTE: For many-to-many, this should be an array update. 
-                // Assuming single assignment for now, but converting string to ObjectId
-                updates.Add(updateBuilder.Set(s => s.StationOperatorId, new ObjectId(updateDto.StationOperatorId)));
+                var operatorObjectIds = updateDto.StationOperatorIds
+                    .Select(id => new ObjectId(id))
+                    .ToList();
+
+                updates.Add(updateBuilder.Set(s => s.StationOperatorIds, operatorObjectIds));
             }
+
 
 
             // Always update the UpdateAt timestamp
@@ -159,5 +190,77 @@ namespace EVChargingSystem.WebAPI.Services
             var combinedUpdate = updateBuilder.Combine(updates);
             return await _stationRepository.PartialUpdateAsync(stationId, combinedUpdate);
         }
+
+        public async Task<List<StationWithBookingsDto>> GetStationsWithUpcomingBookingsAsync()
+        {
+            // IST/SLST Offset
+            TimeSpan istOffset = TimeSpan.FromHours(5.5);
+
+            // 1. Fetch ALL stations
+            var allStations = await _stationRepository.GetAllStationsAsync();
+            var stationObjectIds = allStations.Select(s => new ObjectId(s.Id)).ToList();
+
+            // 2. Fetch ALL relevant upcoming bookings in ONE query
+            var allUpcomingBookings = await _stationRepository.GetUpcomingBookingsByStationIdsAsync(stationObjectIds, 0);
+
+            // 3. Group bookings by Station ID for efficient lookup
+            var bookingsLookup = allUpcomingBookings
+                .GroupBy(b => b.StationId.ToString())
+                .ToDictionary(g => g.Key, g => g.OrderBy(b => b.StartTime).ToList());
+
+            // 4. Map Stations, apply the "MAX 2 bookings" rule, and perform UTC conversion
+            var result = allStations.Select(station =>
+            {
+                var stationDto = new StationWithBookingsDto
+                {
+                    Id = station.Id,
+                    StationName = station.StationName,
+                    StationCode = station.StationCode,
+                    ACChargingSlots = station.ACChargingSlots,
+                    DCChargingSlots = station.DCChargingSlots,
+                    ACSlots = station.ACSlots,
+                    DCSlots = station.DCSlots,
+                    ACPowerOutput = station.ACPowerOutput,
+                    ACConnector = station.ACConnector,
+                    ACChargingTime = station.ACChargingTime,
+                    AddressLine1 = station.AddressLine1,
+                    AddressLine2 = station.AddressLine2,
+                    City = station.City,
+                    Latitude = station.Latitude,
+                    Longitude = station.Longitude,
+                    TotalCapacity = station.TotalCapacity,
+                    Status = station.Status,
+                    AdditionalNotes = station.AdditionalNotes,
+                };
+
+
+                if (bookingsLookup.TryGetValue(station.Id, out var stationBookings))
+                {
+                    stationDto.UpcomingBookings = stationBookings
+                        .Take(2) // APPLYING THE MAX 2 LIMIT HERE
+                        .Select(b =>
+                        {
+
+                            var localStartTime = b.StartTime.Add(istOffset);
+                            var localEndTime = b.EndTime.Add(istOffset);
+
+                            return new SimpleBookingDto
+                            {
+                                BookingId = b.Id,
+                                StartTimeLocal = localStartTime,
+                                EndTimeLocal = localEndTime,
+                                SlotType = b.SlotType
+                            };
+                        })
+                        .ToList();
+                }
+
+                return stationDto;
+            }).ToList();
+
+            return result;
+        }
+
+
     }
 }

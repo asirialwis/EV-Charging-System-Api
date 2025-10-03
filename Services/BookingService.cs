@@ -49,6 +49,7 @@ namespace EVChargingSystem.WebAPI.Services
                 EVOwnerId = new ObjectId(bookingDto.EVOwnerId),
                 StationId = stationId,
                 SlotType = bookingDto.SlotType,
+                SlotId = bookingDto.SlotId,  // Store the specific slot ID
                 StartTime = utcStartTime, // Store UTC time in DB
                 EndTime = utcEndTime,     // Store UTC time in DB
                 Status = "Pending",
