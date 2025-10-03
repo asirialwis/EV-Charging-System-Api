@@ -12,7 +12,7 @@ namespace EVChargingSystem.WebAPI.Data.Dtos
         public string? ACConnector { get; set; }
         public string? ACChargingTime { get; set; }
         public int? TotalCapacity { get; set; }
-        public required string StationOperatorId { get; set; }
+        public List<string> StationOperatorIds { get; set; } = new();
         public required string AddressLine1 { get; set; }
         public string? AddressLine2 { get; set; }
         public required string City { get; set; }

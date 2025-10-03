@@ -31,7 +31,7 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
         public async Task<List<string>> GetAllAssignedOperatorIdsAsync()
         {
             // Projection to include only the StationOperatorId field
-            var projection = Builders<ChargingStation>.Projection.Include(s => s.StationOperatorId);
+            var projection = Builders<ChargingStation>.Projection.Include(s => s.StationOperatorIds);
 
             var assignedDocs = await _stations
                 .Find(_ => true) // Find all stations

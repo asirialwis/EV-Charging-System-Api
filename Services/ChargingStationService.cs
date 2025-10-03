@@ -38,7 +38,7 @@ namespace EVChargingSystem.WebAPI.Services
                 ACConnector = stationDto.ACConnector ?? string.Empty,
                 ACChargingTime = stationDto.ACChargingTime,
                 TotalCapacity = stationDto.TotalCapacity ?? 0,
-                StationOperatorId = new ObjectId(stationDto.StationOperatorId),
+                StationOperatorIds = stationDto.StationOperatorIds.Select(id => ObjectId.Parse(id)).ToList(),
                 AddressLine1 = stationDto.AddressLine1,
                 AddressLine2 = stationDto.AddressLine2 ?? string.Empty,
                 City = stationDto.City,
@@ -170,13 +170,15 @@ namespace EVChargingSystem.WebAPI.Services
             if (updateDto.Longitude != null) updates.Add(updateBuilder.Set(s => s.Longitude, updateDto.Longitude));
             if (updateDto.GooglePlaceID != null) updates.Add(updateBuilder.Set(s => s.GooglePlaceID, updateDto.GooglePlaceID));
 
-            // Station Operator Assignment Update (Requires conversion if not null)
-            if (updateDto.StationOperatorId != null)
+            if (updateDto.StationOperatorIds.Any())
             {
-                // NOTE: For many-to-many, this should be an array update. 
-                // Assuming single assignment for now, but converting string to ObjectId
-                updates.Add(updateBuilder.Set(s => s.StationOperatorId, new ObjectId(updateDto.StationOperatorId)));
+                var operatorObjectIds = updateDto.StationOperatorIds
+                    .Select(id => new ObjectId(id))
+                    .ToList();
+
+                updates.Add(updateBuilder.Set(s => s.StationOperatorIds, operatorObjectIds));
             }
+
 
 
             // Always update the UpdateAt timestamp
@@ -238,7 +240,7 @@ namespace EVChargingSystem.WebAPI.Services
                         .Take(2) // APPLYING THE MAX 2 LIMIT HERE
                         .Select(b =>
                         {
-                           
+
                             var localStartTime = b.StartTime.Add(istOffset);
                             var localEndTime = b.EndTime.Add(istOffset);
 
