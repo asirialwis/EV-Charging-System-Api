@@ -26,7 +26,7 @@ namespace EVChargingSystem.WebAPI.Data.Models
         public int TotalCapacity { get; set; }
 
         [BsonRepresentation(BsonType.ObjectId)]
-        public ObjectId StationOperatorId { get; set; } // Link to the Station Operator user
+         public List<ObjectId> StationOperatorIds { get; set; } = new List<ObjectId>();  // Link to the Station Operator user
 
         public string AddressLine1 { get; set; }
         public string AddressLine2 { get; set; }
@@ -40,5 +40,7 @@ namespace EVChargingSystem.WebAPI.Data.Models
         
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
+
+        
     }
 }

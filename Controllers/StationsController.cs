@@ -55,4 +55,13 @@ public class StationsController : ControllerBase
 
         return Ok(new { Message = "Charging station details updated successfully." });
     }
+
+
+     [HttpGet("with-bookings")]
+    [Authorize(Roles = "Backoffice")] // Assuming this is for Admin dashboard
+    public async Task<IActionResult> GetStationsWithUpcomingBookings()
+    {
+        var stations = await _stationService.GetStationsWithUpcomingBookingsAsync();
+        return Ok(stations);
+    }
 }
