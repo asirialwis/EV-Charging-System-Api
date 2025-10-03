@@ -9,10 +9,12 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
     public class ChargingStationRepository : IChargingStationRepository
     {
         private readonly IMongoCollection<ChargingStation> _stations;
+        private readonly IMongoCollection<Booking> _bookings;
 
         public ChargingStationRepository(MongoDbContext context)
         {
             _stations = context.GetCollection<ChargingStation>("ChargingStations");
+            _bookings = context.GetCollection<Booking>("Bookings");
         }
 
         public async Task CreateAsync(ChargingStation station)
@@ -64,5 +66,19 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
 
             return result.ModifiedCount == 1;
         }
+
+         public async Task<List<Booking>> GetUpcomingBookingsByStationIdsAsync(List<ObjectId> stationIds, int limitPerStation)
+    {
+        var filter = Builders<Booking>.Filter.In(b => b.StationId, stationIds) &
+                     // Status must be active/pending and StartTime must be in the future
+                     Builders<Booking>.Filter.Gt(b => b.StartTime, DateTime.UtcNow) &
+                     Builders<Booking>.Filter.Ne(b => b.Status, "Canceled") &
+                     Builders<Booking>.Filter.Ne(b => b.Status, "Completed");
+
+        // Fetch all future, relevant bookings, sorted by start time
+        var pipeline = _bookings.Find(filter).SortBy(b => b.StartTime);
+
+        return await pipeline.ToListAsync();
+    }
     }
 }

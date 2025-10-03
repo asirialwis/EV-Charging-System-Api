@@ -24,7 +24,7 @@ namespace EVChargingSystem.WebAPI.Services
         {
             var acSlotCount = stationDto.ACChargingSlots ?? 0;
             var dcSlotCount = stationDto.DCChargingSlots ?? 0;
-            
+
             var station = new ChargingStation
             {
                 StationName = stationDto.StationName,
@@ -188,5 +188,77 @@ namespace EVChargingSystem.WebAPI.Services
             var combinedUpdate = updateBuilder.Combine(updates);
             return await _stationRepository.PartialUpdateAsync(stationId, combinedUpdate);
         }
+
+        public async Task<List<StationWithBookingsDto>> GetStationsWithUpcomingBookingsAsync()
+        {
+            // IST/SLST Offset
+            TimeSpan istOffset = TimeSpan.FromHours(5.5);
+
+            // 1. Fetch ALL stations
+            var allStations = await _stationRepository.GetAllStationsAsync();
+            var stationObjectIds = allStations.Select(s => new ObjectId(s.Id)).ToList();
+
+            // 2. Fetch ALL relevant upcoming bookings in ONE query
+            var allUpcomingBookings = await _stationRepository.GetUpcomingBookingsByStationIdsAsync(stationObjectIds, 0);
+
+            // 3. Group bookings by Station ID for efficient lookup
+            var bookingsLookup = allUpcomingBookings
+                .GroupBy(b => b.StationId.ToString())
+                .ToDictionary(g => g.Key, g => g.OrderBy(b => b.StartTime).ToList());
+
+            // 4. Map Stations, apply the "MAX 2 bookings" rule, and perform UTC conversion
+            var result = allStations.Select(station =>
+            {
+                var stationDto = new StationWithBookingsDto
+                {
+                    Id = station.Id,
+                    StationName = station.StationName,
+                    StationCode = station.StationCode,
+                    ACChargingSlots = station.ACChargingSlots,
+                    DCChargingSlots = station.DCChargingSlots,
+                    ACSlots = station.ACSlots,
+                    DCSlots = station.DCSlots,
+                    ACPowerOutput = station.ACPowerOutput,
+                    ACConnector = station.ACConnector,
+                    ACChargingTime = station.ACChargingTime,
+                    AddressLine1 = station.AddressLine1,
+                    AddressLine2 = station.AddressLine2,
+                    City = station.City,
+                    Latitude = station.Latitude,
+                    Longitude = station.Longitude,
+                    TotalCapacity = station.TotalCapacity,
+                    Status = station.Status,
+                    AdditionalNotes = station.AdditionalNotes,
+                };
+
+
+                if (bookingsLookup.TryGetValue(station.Id, out var stationBookings))
+                {
+                    stationDto.UpcomingBookings = stationBookings
+                        .Take(2) // APPLYING THE MAX 2 LIMIT HERE
+                        .Select(b =>
+                        {
+                           
+                            var localStartTime = b.StartTime.Add(istOffset);
+                            var localEndTime = b.EndTime.Add(istOffset);
+
+                            return new SimpleBookingDto
+                            {
+                                BookingId = b.Id,
+                                StartTimeLocal = localStartTime,
+                                EndTimeLocal = localEndTime,
+                                SlotType = b.SlotType
+                            };
+                        })
+                        .ToList();
+                }
+
+                return stationDto;
+            }).ToList();
+
+            return result;
+        }
+
+
     }
 }
