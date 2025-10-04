@@ -11,6 +11,13 @@ namespace EVChargingSystem.WebAPI.Data.Dtos
         public DateTime EndTimeLocal { get; set; }
         public string SlotType { get; set; }
     }
+    
+    public class SimpleOperatorDto
+    {
+        public string Id { get; set; }
+        public string FullName { get; set; }
+        public string Email { get; set; }
+    }
 
     // Outer DTO for the Station and its bookings
     public class StationWithBookingsDto
@@ -31,10 +38,11 @@ namespace EVChargingSystem.WebAPI.Data.Dtos
         public string City { get; set; }
         public string Latitude { get; set; }
         public string Longitude { get; set; }
-        public int TotalCapacity { get; set; } 
+        public int TotalCapacity { get; set; }
         public string Status { get; set; }
 
         public string AdditionalNotes { get; set; }
+          public List<SimpleOperatorDto> AssignedOperators { get; set; } = new List<SimpleOperatorDto>();
         public List<SimpleBookingDto> UpcomingBookings { get; set; } = new List<SimpleBookingDto>();
     }
 }

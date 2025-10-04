@@ -1,5 +1,6 @@
 using MongoDB.Driver;
 using EVChargingApi.Data.Models;
+using MongoDB.Bson;
 
 namespace EVChargingSystem.WebAPI.Data.Repositories
 {
@@ -54,6 +55,27 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
                 Builders<User>.Filter.Eq(u => u.Status, "Active")
             );
 
+            return await _users.Find(filter).ToListAsync();
+        }
+
+        public async Task<List<User>> FindManyByIdsAsync(List<string> userIds)
+        {
+            // 1. Convert the list of string IDs to ObjectIds
+            var objectIds = userIds
+                .Where(id => ObjectId.TryParse(id, out _))
+                .Select(id => new ObjectId(id))
+                .ToList();
+
+            if (!objectIds.Any())
+            {
+                return new List<User>();
+            }
+
+            // 2. CORRECTED FILTER: Use the Bson ID field "_id" for comparison
+            // We are filtering where the document's _id is IN the list of objectIds.
+            var filter = Builders<User>.Filter.In("_id", objectIds);
+
+            // 3. Execute the query
             return await _users.Find(filter).ToListAsync();
         }
 
