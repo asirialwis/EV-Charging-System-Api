@@ -11,7 +11,8 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
 
         // New method for suspend user
         Task<bool> UpdateStatusAsync(string userId, string newStatus);
-        
+
         Task<List<User>> GetUsersByRoleAsync(string role);
+        Task<List<User>> FindManyByIdsAsync(List<string> userIds); 
     }
 }
