@@ -41,11 +41,6 @@ namespace EVChargingSystem.WebAPI.Services
             return (user, null);
         }
 
-        private User BadRequest(string v)
-        {
-            throw new NotImplementedException();
-        }
-
         public async Task CreateAsync(User user)
         {
             // The service calls the repository's create method
@@ -194,5 +189,40 @@ namespace EVChargingSystem.WebAPI.Services
             // 5. Save to repository using the new PartialUpdateAsync
             return await _profileRepository.PartialUpdateAsync(nic, combinedUpdate);
         }
+
+
+        public async Task<EVOwnerProfileDto?> GetOwnerProfileAsync(string userId)
+        {
+            // 1. Fetch the Profile using the UserId from the JWT token
+            var profile = await _profileRepository.FindByUserIdAsync(userId);
+            if (profile == null)
+            {
+                // This scenario indicates a corrupt state (User exists, but no profile)
+                return null;
+            }
+
+            // 2. Fetch the corresponding User document for the email
+            var user = await _userRepository.FindByIdAsync(userId);
+            if (user == null)
+            {
+                // Should not happen if data is consistent, but handles edge cases
+                return null;
+            }
+
+            // 3. Map and return the combined DTO
+            return new EVOwnerProfileDto
+            {
+                Nic = profile.Nic,
+                Email = user.Email, // Joined from User document
+                FullName = profile.FullName,
+                Phone = profile.Phone,
+                Address = profile.Address,
+                VehicleModel = profile.VehicleModel,
+                LicensePlate = profile.LicensePlate,
+                Status = profile.Status,
+                CreatedAt = profile.CreatedAt
+            };
+        }
+
     }
 }

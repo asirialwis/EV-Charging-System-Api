@@ -29,15 +29,39 @@ public class EVOwnersController : ControllerBase
         var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
 
         if (userId == null || userRole == null) return Unauthorized("Invalid token credentials.");
-        
+
         var success = await _userService.UpdateEVOwnerAsync(nic, updateDto, userId, userRole);
-        
-        if (!success) 
+
+        if (!success)
         {
             // Provides a generic error to prevent revealing if the NIC exists but access was denied
             return Unauthorized("Update failed. You are not authorized to do this modification.");
         }
         return Ok(new { Message = "EV Owner profile updated." });
+    }
+    
+
+    [HttpGet("profile")]
+    public async Task<IActionResult> GetOwnerProfile()
+    {
+        // 1. Extract the authenticated User ID from the JWT token
+        var userId = User.FindFirst("id")?.Value;
+        
+        if (userId == null) 
+        {
+            // Should not happen if Authorize worked, but is a safety net
+            return Unauthorized("User ID claim missing."); 
+        }
+
+        // 2. Call the service to retrieve the combined profile
+        var profileDto = await _userService.GetOwnerProfileAsync(userId);
+        
+        if (profileDto == null) 
+        {
+            return NotFound("EV Owner profile not found.");
+        }
+
+        return Ok(profileDto);
     }
 
 }
