@@ -203,6 +203,18 @@ namespace EVChargingSystem.WebAPI.Services
             // 2. Fetch ALL relevant upcoming bookings in ONE query
             var allUpcomingBookings = await _stationRepository.GetUpcomingBookingsByStationIdsAsync(stationObjectIds, 0);
 
+
+ // 3. Collect all unique operator IDs from ALL stations
+            var allOperatorIds = allStations
+                .SelectMany(s => s.StationOperatorIds) // Flatten the List<ObjectId> from all stations
+                .Distinct()
+                .Select(oid => oid.ToString())
+                .ToList();
+            
+            // 4. Fetch all operator user records in ONE batch query
+            var allOperatorUsers = await _userRepository.FindManyByIdsAsync(allOperatorIds); 
+            var operatorLookup = allOperatorUsers.ToDictionary(u => u.Id, u => u);
+
             // 3. Group bookings by Station ID for efficient lookup
             var bookingsLookup = allUpcomingBookings
                 .GroupBy(b => b.StationId.ToString())
@@ -232,6 +244,18 @@ namespace EVChargingSystem.WebAPI.Services
                     Status = station.Status,
                     AdditionalNotes = station.AdditionalNotes,
                 };
+
+                // --- JOIN OPERATOR DETAILS (One-to-Many) ---
+                stationDto.AssignedOperators = station.StationOperatorIds
+                    .Select(oid => oid.ToString())
+                    .Where(id => operatorLookup.ContainsKey(id)) // Ensure user details were fetched
+                    .Select(id => new SimpleOperatorDto
+                    {
+                        Id = id,
+                        FullName = operatorLookup[id].FullName,
+                        Email = operatorLookup[id].Email
+                    })
+                    .ToList();
 
 
                 if (bookingsLookup.TryGetValue(station.Id, out var stationBookings))

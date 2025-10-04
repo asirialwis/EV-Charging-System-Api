@@ -6,6 +6,12 @@ using MongoDB.Bson;
 
 namespace EVChargingSystem.WebAPI.Data.Repositories
 {
+    public class UnwoundOperatorId
+    {
+        // This is the actual ObjectId value that was unwound from the array
+        public ObjectId StationOperatorIds { get; set; }
+    }
+
     public class ChargingStationRepository : IChargingStationRepository
     {
         private readonly IMongoCollection<ChargingStation> _stations;
@@ -28,27 +34,30 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             return await _stations.Find(s => s.Id == stationId.ToString()).FirstOrDefaultAsync();
         }
 
+
+
+
         public async Task<List<string>> GetAllAssignedOperatorIdsAsync()
         {
-            // Projection to include only the StationOperatorId field
-            var projection = Builders<ChargingStation>.Projection.Include(s => s.StationOperatorIds);
+            // The pipeline result is IMongoAggregateQueryable<string>, which can be used with ToListAsync()
 
-            var assignedDocs = await _stations
-                .Find(_ => true) // Find all stations
-                .Project<BsonDocument>(projection)
-                .ToListAsync();
+            // --- FIX 2: Correct usage of var and pipeline definition ---
+            var pipeline = _stations.Aggregate()
+                // 1. Match/Filter (Ensure array is not null before unwinding)
+                .Match(Builders<ChargingStation>.Filter.Ne(s => s.StationOperatorIds, null))
 
-            //  MAPPING LOGIC:
-            return assignedDocs
-                .Where(doc => doc.Contains("StationOperatorId"))
-                .Select(doc =>
-                {
-                    // 1. Get the value as a BsonObjectId
-                    var objectId = doc["StationOperatorId"].AsObjectId;
-                    // 2. Convert the ObjectId instance to a string
-                    return objectId.ToString();
-                })
-                .ToList();
+                // 2. Unwind: Deconstructs the array. The output type is the UnwoundOperatorId class defined above.
+                .Unwind<ChargingStation, UnwoundOperatorId>(s => s.StationOperatorIds)
+
+                // 3. Project: Now, use the strongly-typed property of the unwound class
+                // Convert ObjectId to string here
+                .Project(u => u.StationOperatorIds.ToString());
+
+            
+            // Execute the aggregation and collect the list of strings
+            return await pipeline.ToListAsync();
+
+
         }
 
         public async Task<List<ChargingStation>> GetAllStationsAsync()
@@ -67,18 +76,18 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             return result.ModifiedCount == 1;
         }
 
-         public async Task<List<Booking>> GetUpcomingBookingsByStationIdsAsync(List<ObjectId> stationIds, int limitPerStation)
-    {
-        var filter = Builders<Booking>.Filter.In(b => b.StationId, stationIds) &
-                     // Status must be active/pending and StartTime must be in the future
-                     Builders<Booking>.Filter.Gt(b => b.StartTime, DateTime.UtcNow) &
-                     Builders<Booking>.Filter.Ne(b => b.Status, "Canceled") &
-                     Builders<Booking>.Filter.Ne(b => b.Status, "Completed");
+        public async Task<List<Booking>> GetUpcomingBookingsByStationIdsAsync(List<ObjectId> stationIds, int limitPerStation)
+        {
+            var filter = Builders<Booking>.Filter.In(b => b.StationId, stationIds) &
+                         // Status must be active/pending and StartTime must be in the future
+                         Builders<Booking>.Filter.Gt(b => b.StartTime, DateTime.UtcNow) &
+                         Builders<Booking>.Filter.Ne(b => b.Status, "Canceled") &
+                         Builders<Booking>.Filter.Ne(b => b.Status, "Completed");
 
-        // Fetch all future, relevant bookings, sorted by start time
-        var pipeline = _bookings.Find(filter).SortBy(b => b.StartTime);
+            // Fetch all future, relevant bookings, sorted by start time
+            var pipeline = _bookings.Find(filter).SortBy(b => b.StartTime);
 
-        return await pipeline.ToListAsync();
-    }
+            return await pipeline.ToListAsync();
+        }
     }
 }
