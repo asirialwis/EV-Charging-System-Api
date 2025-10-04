@@ -10,5 +10,6 @@ namespace EVChargingApi.Data.Repositories
 
         Task<bool> PartialUpdateAsync(string nic, UpdateDefinition<EVOwnerProfile> updateDefinition);
         Task<EVOwnerProfile> FindByUserIdAsync(string userId);
+        Task<List<EVOwnerProfile>> GetAllProfilesAsync(); 
     }
 }

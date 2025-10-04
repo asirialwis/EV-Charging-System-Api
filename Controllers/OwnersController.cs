@@ -9,7 +9,7 @@ using EVChargingApi.Services;
 [ApiController]
 [Route("api/evowners")] // Simplified route for both admin/owner access
 // Allow both EVOwner and Backoffice roles access to this controller
-[Authorize(Roles = "Backoffice, EVOwner")]
+
 public class EVOwnersController : ControllerBase
 {
     private readonly IUserService _userService;
@@ -22,6 +22,7 @@ public class EVOwnersController : ControllerBase
 
     // U - Update EV Owner Profile (Used by Admin and Owner)
     [HttpPatch("{nic}")]
+    [Authorize(Roles = "Backoffice, EVOwner")]
     public async Task<IActionResult> UpdateEVOwner(string nic, [FromBody] UpdateEVOwnerDto updateDto)
     {
         // 1. Get Logged-in User ID and Role from JWT Claims
@@ -39,24 +40,25 @@ public class EVOwnersController : ControllerBase
         }
         return Ok(new { Message = "EV Owner profile updated." });
     }
-    
+
 
     [HttpGet("profile")]
+    [Authorize(Roles = "EVOwner")]
     public async Task<IActionResult> GetOwnerProfile()
     {
         // 1. Extract the authenticated User ID from the JWT token
         var userId = User.FindFirst("id")?.Value;
-        
-        if (userId == null) 
+
+        if (userId == null)
         {
             // Should not happen if Authorize worked, but is a safety net
-            return Unauthorized("User ID claim missing."); 
+            return Unauthorized("User ID claim missing.");
         }
 
         // 2. Call the service to retrieve the combined profile
         var profileDto = await _userService.GetOwnerProfileAsync(userId);
-        
-        if (profileDto == null) 
+
+        if (profileDto == null)
         {
             return NotFound("EV Owner profile not found.");
         }
@@ -64,8 +66,16 @@ public class EVOwnersController : ControllerBase
         return Ok(profileDto);
     }
 
+
+    [HttpGet]
+    [Authorize(Roles = "Backoffice")]
+    public async Task<IActionResult> GetAllEVOwners()
+    {
+        var owners = await _userService.GetAllEVOwnersAsync();
+        return Ok(owners);
+    }
+
 }
-    
-    
-    
-   
+
+
+

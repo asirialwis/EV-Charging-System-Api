@@ -220,8 +220,47 @@ namespace EVChargingSystem.WebAPI.Services
                 VehicleModel = profile.VehicleModel,
                 LicensePlate = profile.LicensePlate,
                 Status = profile.Status,
-                CreatedAt = profile.CreatedAt
+                CreatedAt = profile.CreatedAt,
+                UpdatedAt = profile.UpdatedAt
             };
+        }
+
+
+        public async Task<List<EVOwnerProfileDto>> GetAllEVOwnersAsync()
+        {
+            // 1. Fetch all profiles (contains NIC, UserId, FullName, Status, etc.)
+            var allProfiles = await _profileRepository.GetAllProfilesAsync();
+
+            // 2. Collect all unique User IDs needed for the join
+            var userIds = allProfiles.Select(p => p.UserId.ToString()).Distinct().ToList();
+
+            // 3. Fetch all corresponding User documents (contains Email, Status) in ONE batch query
+            var allUsers = await _userRepository.FindManyByIdsAsync(userIds);
+
+            // 4. Create a fast lookup dictionary (key: UserId)
+            var userLookup = allUsers.ToDictionary(u => u.Id, u => u);
+
+            // 5. Perform the in-memory join and mapping
+            var result = allProfiles.Select(profile =>
+            {
+                // Try to find the corresponding User document
+                userLookup.TryGetValue(profile.UserId.ToString(), out var user);
+
+                return new EVOwnerProfileDto
+                {
+                    Nic = profile.Nic,
+                    Email = user?.Email ?? "N/A", // Use "N/A" if user record is missing
+                    FullName = profile.FullName,
+                    Phone = profile.Phone,
+                    Address = profile.Address,
+                    VehicleModel = profile.VehicleModel,
+                    LicensePlate = profile.LicensePlate,
+                    Status = profile.Status,
+                    CreatedAt = profile.CreatedAt
+                };
+            }).ToList();
+
+            return result;
         }
 
     }

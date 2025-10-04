@@ -14,5 +14,7 @@ namespace EVChargingSystem.WebAPI.Data.Dtos
         public string LicensePlate { get; set; }
         public string Status { get; set; } // Active/Deactivated
         public DateTime CreatedAt { get; set; }
+
+        public DateTime UpdatedAt { get; set; }
     }
 }
