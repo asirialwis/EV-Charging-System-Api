@@ -13,6 +13,9 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
         Task<bool> UpdateStatusAsync(string userId, string newStatus);
 
         Task<List<User>> GetUsersByRoleAsync(string role);
-        Task<List<User>> FindManyByIdsAsync(List<string> userIds); 
+        Task<List<User>> FindManyByIdsAsync(List<string> userIds);
+
+        Task<User> FindByIdAsync(string userId);
+        
     }
 }

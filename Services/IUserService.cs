@@ -13,5 +13,8 @@ namespace EVChargingApi.Services
 
         Task<bool> UpdateEVOwnerAsync(string nic, UpdateEVOwnerDto updateDto, string requestingUserId, string userRole);
 
+        Task<EVOwnerProfileDto?> GetOwnerProfileAsync(string userId);
+        Task<List<EVOwnerProfileDto>> GetAllEVOwnersAsync();
+
     }
 }

@@ -1,6 +1,7 @@
 ﻿using MongoDB.Driver;
 using EVChargingApi.Data.Models;
 using EVChargingSystem.WebAPI.Data;
+using MongoDB.Bson;
 
 namespace EVChargingApi.Data.Repositories
 {
@@ -30,6 +31,26 @@ namespace EVChargingApi.Data.Repositories
             var result = await _profiles.UpdateOneAsync(filter, updateDefinition);
 
             return result.ModifiedCount == 1;
+        }
+
+        public async Task<EVOwnerProfile> FindByUserIdAsync(string userId)
+        {
+            // CRITICAL STEP: Convert the string userId to an ObjectId
+            if (!ObjectId.TryParse(userId, out var objectId))
+            {
+                // Return null if the provided ID is not a valid ObjectId format
+                return null;
+            }
+
+            // Filter: Find the profile where the UserId field matches the ObjectId
+            var filter = Builders<EVOwnerProfile>.Filter.Eq(p => p.UserId, objectId);
+
+            return await _profiles.Find(filter).FirstOrDefaultAsync();
+        }
+
+        public async Task<List<EVOwnerProfile>> GetAllProfilesAsync()
+        {
+            return await _profiles.Find(_ => true).ToListAsync();
         }
     }
 }

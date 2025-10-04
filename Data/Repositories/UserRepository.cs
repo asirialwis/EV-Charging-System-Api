@@ -7,6 +7,7 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
     public class UserRepository : IUserRepository
     {
         private readonly IMongoCollection<User> _users;
+        private readonly IMongoCollection<EVOwnerProfile> _profiles;
 
         public UserRepository(MongoDbContext context)
         {
@@ -77,6 +78,17 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
 
             // 3. Execute the query
             return await _users.Find(filter).ToListAsync();
+        }
+
+
+           public async Task<User> FindByIdAsync(string userId)
+        {
+            // The User model's Id property is mapped to the document's _id.
+            // We can search directly on the string Id because the MongoDB driver
+            // efficiently converts this to an ObjectId for the query.
+            var filter = Builders<User>.Filter.Eq(u => u.Id, userId);
+            
+            return await _users.Find(filter).FirstOrDefaultAsync();
         }
 
     }
