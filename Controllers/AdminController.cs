@@ -9,10 +9,12 @@ using System.Threading.Tasks;
 public class AdminController : ControllerBase
 {
     private readonly IBookingService _bookingService;
+    private readonly IDashboardService _dashboardService;
 
-    public AdminController(IBookingService bookingService)
+    public AdminController(IBookingService bookingService, IDashboardService dashboardService)
     {
         _bookingService = bookingService;
+        _dashboardService = dashboardService;
     }
 
     [HttpPost("approve-booking/{bookingId}")]
@@ -29,4 +31,13 @@ public class AdminController : ControllerBase
         // Return the QR code string so the Backoffice UI can store it or forward it
         return Ok(new { Message = message, QRCodeBase64 = qrCode });
     }
+
+    [HttpGet("dashboard-metrics")]
+    public async Task<IActionResult> GetDashboardMetrics()
+    {
+        var metrics = await _dashboardService.GetMetricsAsync();
+        return Ok(metrics);
+    }
+
+
 }
