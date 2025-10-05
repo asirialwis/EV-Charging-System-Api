@@ -96,11 +96,11 @@ namespace EVChargingSystem.WebAPI.Services
 
         public async Task<List<StationAssignmentDto>> GetAllStationsForAssignmentAsync()
         {
-            // 1. Fetch ALL stations (requires GetAllStationsAsync in IChargingStationRepository)
-            var allStations = await _stationRepository.GetAllStationsAsync();
+            // 1. Fetch ONLY Active stations using the new repository method
+            var activeStations = await _stationRepository.GetActiveStationsAsync();
 
             // 2. Map to the light DTO for the UI
-            var assignmentList = allStations
+            var assignmentList = activeStations
                 .Select(s => new StationAssignmentDto
                 {
                     Id = s.Id,
