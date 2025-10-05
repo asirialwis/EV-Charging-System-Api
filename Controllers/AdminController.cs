@@ -39,5 +39,12 @@ public class AdminController : ControllerBase
         return Ok(metrics);
     }
 
+    [HttpGet("charging-stations/locations")]
+    public async Task<IActionResult> GetStationLocations()
+    {
+        var locations = await _dashboardService.GetActiveStationLocationsAsync();
+        return Ok(locations);
+    }
+
 
 }

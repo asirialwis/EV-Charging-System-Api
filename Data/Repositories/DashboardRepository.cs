@@ -4,6 +4,7 @@ using EVChargingSystem.WebAPI.Data;
 using System;
 using System.Threading.Tasks;
 using System.Linq;
+using EVChargingSystem.WebAPI.Data.Dtos;
 
 namespace EVChargingSystem.WebAPI.Data.Repositories
 {
@@ -21,7 +22,7 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
         public async Task<long> CountReservationsByStatusAsync(string status, bool futureOnly)
         {
             var filter = Builders<Booking>.Filter.Eq(b => b.Status, status);
-            
+
             if (futureOnly)
             {
                 // Only count bookings whose StartTime is in the future
@@ -46,13 +47,14 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
         {
             // 1. Calculate Total Slots for TODAY (from all Active stations)
             var activeStationFilter = Builders<ChargingStation>.Filter.Eq(s => s.Status, "Active");
-            
+
             // Aggregation to sum up all ACChargingSlots and DCChargingSlots from Active Stations
             var totalCapacity = await _stations.Aggregate()
                 .Match(activeStationFilter)
                 .Group(
                     _ => 1, // Group all results into one document
-                    g => new { 
+                    g => new
+                    {
                         TotalSlots = g.Sum(s => s.ACChargingSlots + s.DCChargingSlots)
                     }
                 )
@@ -63,7 +65,7 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             // 2. Calculate Used Slots for TODAY
             // IST/SLST Offset
             TimeSpan istOffset = TimeSpan.FromHours(5.5);
-            
+
             // Define the start and end of TODAY in UTC (based on local IST/SLST day)
             var localToday = DateTime.UtcNow.Add(istOffset).Date;
             var utcDayStart = localToday.Subtract(istOffset);
@@ -78,12 +80,47 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
                     Builders<Booking>.Filter.Eq(b => b.Status, "Pending")
                 )
             );
-            
+
             // NOTE: Since the assignment implies a simple count of *bookings* equals *used slots* for the purpose of the percentage:
             long usedSlots = await _bookings.CountDocumentsAsync(usedSlotsFilter);
 
             // You could alternatively aggregate booking duration, but simple count is often expected for simple dashboard metrics.
             return (usedSlots, totalSlots);
         }
+        
+
+         public async Task<List<ChargingStationLocationDto>> GetActiveStationLocationsAsync()
+        {
+            var filter = Builders<ChargingStation>.Filter.Eq(s => s.Status, "Active");
+            
+            // --- Step 1: Execute the query and materialize the raw data ---
+            // Fetch all active station documents into C# memory
+            var rawStations = await _stations
+                .Find(filter)
+                .ToListAsync(); // <-- Query executed here
+            
+            // --- Step 2: Use LINQ-to-Objects to perform C#-specific conversion ---
+            var locations = rawStations.Select(s =>
+            {
+                // We are now in C# memory, so TryParse and 'out var' are allowed.
+                double.TryParse(s.Latitude, out var lat);
+                double.TryParse(s.Longitude, out var lon);
+
+                return new ChargingStationLocationDto
+                {
+                    StationId = s.Id.ToString(),
+                    StationName = s.StationName,
+                    StationCode = s.StationCode,
+                    // Use the safely parsed values, defaulting to 0.0 if TryParse failed
+                    Latitude = lat, 
+                    Longitude = lon, 
+                    Status = s.Status,
+                    TotalCapacity = s.TotalCapacity.ToString()
+                };
+            }).ToList();
+
+            return locations;
+        }
+        
     }
 }

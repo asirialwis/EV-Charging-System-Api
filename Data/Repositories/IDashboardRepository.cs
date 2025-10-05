@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using EVChargingSystem.WebAPI.Data.Dtos;
 
 namespace EVChargingSystem.WebAPI.Data.Repositories
 {
@@ -8,5 +9,6 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
         Task<long> CountStationsByStatusAsync(string status);
         Task<long> CountAllStationsAsync();
         Task<(long Used, long Total)> CalculateTodayCapacityAsync();
+        Task<List<ChargingStationLocationDto>> GetActiveStationLocationsAsync();
     }
 }

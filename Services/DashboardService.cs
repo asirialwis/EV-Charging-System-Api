@@ -33,8 +33,8 @@ namespace EVChargingSystem.WebAPI.Services
             var (usedSlots, totalSlots) = capacityTask.Result;
 
             // 3. Calculate Percentage
-            double capacityPercentage = (totalSlots > 0) 
-                ? Math.Round(((double)usedSlots / totalSlots) * 100, 2) 
+            double capacityPercentage = (totalSlots > 0)
+                ? Math.Round(((double)usedSlots / totalSlots) * 100, 2)
                 : 0.0;
 
             // 4. Return DTO
@@ -48,6 +48,11 @@ namespace EVChargingSystem.WebAPI.Services
                 TodayCapacityTotalSlots = (int)totalSlots,
                 TodayCapacityPercentage = capacityPercentage
             };
+        }
+
+        public async Task<List<ChargingStationLocationDto>> GetActiveStationLocationsAsync()
+        {
+            return await _dashboardRepository.GetActiveStationLocationsAsync();
         }
     }
 }
