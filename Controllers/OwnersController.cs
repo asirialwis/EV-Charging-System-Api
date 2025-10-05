@@ -68,14 +68,30 @@ public class EVOwnersController : ControllerBase
 
 
     [HttpGet]
-    [Authorize(Roles = "Backoffice")]
+    [Authorize(Roles = "Backoffice, EVOwner")]
     public async Task<IActionResult> GetAllEVOwners()
     {
         var owners = await _userService.GetAllEVOwnersAsync();
         return Ok(owners);
     }
 
+
+    [HttpDelete("profile/{nic}")] // Use a dedicated route segment for Admin deletes
+    [Authorize(Roles = "Backoffice")] 
+    public async Task<IActionResult> DeleteEVOwner(string nic)
+    {
+        var (success, message) = await _userService.DeleteEVOwnerAsync(nic);
+        
+        if (!success) 
+        {
+            return NotFound(new { Message = message });
+        }
+        
+        return Ok(new { Message = message });
+    }
 }
+
+
 
 
 

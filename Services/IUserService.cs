@@ -16,5 +16,8 @@ namespace EVChargingApi.Services
         Task<EVOwnerProfileDto?> GetOwnerProfileAsync(string userId);
         Task<List<EVOwnerProfileDto>> GetAllEVOwnersAsync();
 
+        Task<(bool Success, string Message)> CreateOperatorAndAssignStationsAsync(CreateOperationalUserDto userDto);
+        Task<(bool Success, string Message)> DeleteEVOwnerAsync(string nic);
+
     }
 }

@@ -53,7 +53,7 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
                 // Convert ObjectId to string here
                 .Project(u => u.StationOperatorIds.ToString());
 
-            
+
             // Execute the aggregation and collect the list of strings
             return await pipeline.ToListAsync();
 
@@ -64,6 +64,13 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
         {
             // Implementation to find ALL documents
             return await _stations.Find(_ => true).ToListAsync();
+        }
+
+        public async Task<List<ChargingStation>> GetActiveStationsAsync()
+        {
+            // Implementation to find ONLY documents where Status == "Active"
+            var filter = Builders<ChargingStation>.Filter.Eq(s => s.Status, "Active");
+            return await _stations.Find(filter).ToListAsync();
         }
 
         public async Task<bool> PartialUpdateAsync(string stationId, UpdateDefinition<ChargingStation> updateDefinition)
@@ -88,6 +95,31 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             var pipeline = _bookings.Find(filter).SortBy(b => b.StartTime);
 
             return await pipeline.ToListAsync();
+        }
+        
+
+  public async Task<bool> AddOperatorToStationsAsync(List<string> stationIds, string newOperatorId)
+        {
+            // 1. Convert NEW Operator ID to ObjectId 
+            if (!ObjectId.TryParse(newOperatorId, out var operatorObjectId)) return false;
+
+            // CRITICAL FIX: Ensure the list of station IDs is not empty before proceeding
+            if (!stationIds.Any()) return false; 
+
+            // 2. Define the filter: Select all stations whose string ID is in the provided list
+      
+            var filter = Builders<ChargingStation>.Filter.In(s => s.Id, stationIds);
+            
+            // 3. Define the update: Atomically push the new Operator ID to the StationOperatorIds array
+            var update = Builders<ChargingStation>.Update
+                .Push(s => s.StationOperatorIds, operatorObjectId) // operatorObjectId is correctly BsonObjectId
+                .Set(s => s.UpdatedAt, DateTime.UtcNow);
+
+            // 4. Execute the update on multiple documents
+            var result = await _stations.UpdateManyAsync(filter, update);
+
+            // Check that at least one station was modified
+            return result.ModifiedCount > 0;
         }
     }
 }
