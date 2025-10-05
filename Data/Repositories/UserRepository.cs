@@ -81,14 +81,20 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
         }
 
 
-           public async Task<User> FindByIdAsync(string userId)
+        public async Task<User> FindByIdAsync(string userId)
         {
             // The User model's Id property is mapped to the document's _id.
             // We can search directly on the string Id because the MongoDB driver
             // efficiently converts this to an ObjectId for the query.
             var filter = Builders<User>.Filter.Eq(u => u.Id, userId);
-            
+
             return await _users.Find(filter).FirstOrDefaultAsync();
+        }
+        public async Task<bool> DeleteAsync(string userId)
+        {
+            var filter = Builders<User>.Filter.Eq(u => u.Id, userId);
+            var result = await _users.DeleteOneAsync(filter);
+            return result.DeletedCount == 1;
         }
 
     }

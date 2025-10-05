@@ -52,5 +52,18 @@ namespace EVChargingApi.Data.Repositories
         {
             return await _profiles.Find(_ => true).ToListAsync();
         }
+
+
+        public async Task<bool> DeleteAsync(string nic)
+        {
+            // Define the filter to find the document by NIC
+            var filter = Builders<EVOwnerProfile>.Filter.Eq(p => p.Nic, nic);
+            
+            // Execute the deletion
+            var result = await _profiles.DeleteOneAsync(filter);
+            
+            // Return true if exactly one document was deleted
+            return result.DeletedCount == 1;
+        }
     }
 }
