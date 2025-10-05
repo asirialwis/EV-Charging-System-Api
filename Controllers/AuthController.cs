@@ -60,7 +60,7 @@ public class AuthController : ControllerBase
     }
 
 
-    [HttpPost("create-operational-user")]
+     [HttpPost("create-operational-user")]
     [Authorize(Roles = "Backoffice")]
     public async Task<IActionResult> CreateOperationalUser([FromBody] CreateOperationalUserDto userDto)
     {
@@ -69,20 +69,15 @@ public class AuthController : ControllerBase
             return BadRequest("Invalid role. Role must be 'Backoffice' or 'StationOperator'.");
         }
 
-        // Map the DTO to the User entity.
-        var user = new User
+        // Call the new transactional service method
+        var (success, message) = await _userService.CreateOperatorAndAssignStationsAsync(userDto);
+        
+        if (!success)
         {
-            Email = userDto.Email,
-            Password = userDto.Password,
-            Role = userDto.Role,
-            FullName = userDto.FullName,
-            Phone = userDto.Phone,
-            AssignedStations = userDto.AssignedStations,
-            Status = "Active" // New users are active by default
-        };
-
-        await _userService.CreateAsync(user);
-        return Ok(new { Message = $"User with role {user.Role} created successfully." });
+            return BadRequest(new { Message = message });
+        }
+        
+        return Ok(new { Message = message });
     }
 
     private string GenerateJwtToken(User user)
