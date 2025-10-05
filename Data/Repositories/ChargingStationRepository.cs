@@ -66,6 +66,13 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             return await _stations.Find(_ => true).ToListAsync();
         }
 
+        public async Task<List<ChargingStation>> GetActiveStationsAsync()
+        {
+            // Implementation to find ONLY documents where Status == "Active"
+            var filter = Builders<ChargingStation>.Filter.Eq(s => s.Status, "Active");
+            return await _stations.Find(filter).ToListAsync();
+        }
+
         public async Task<bool> PartialUpdateAsync(string stationId, UpdateDefinition<ChargingStation> updateDefinition)
         {
             var filter = Builders<ChargingStation>.Filter.Eq(s => s.Id, stationId);

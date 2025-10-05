@@ -16,6 +16,7 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
         Task<List<User>> FindManyByIdsAsync(List<string> userIds);
 
         Task<User> FindByIdAsync(string userId);
+        Task<bool> DeleteAsync(string userId);
         
     }
 }
