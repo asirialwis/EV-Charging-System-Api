@@ -10,7 +10,8 @@ using Swashbuckle.AspNetCore.Filters;
 using Microsoft.OpenApi.Models;
 using EVChargingSystem.WebAPI.Data.Repositories;
 using EVChargingApi.Data.Repositories;
-ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+using EVChargingSystem.WebAPI.Data.Models;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Configure logging
@@ -43,6 +44,12 @@ builder.Services.AddScoped<IEVOwnerProfileRepository, EVOwnerProfileRepository>(
 
 builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
+
+
+
+builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
+builder.Services.AddScoped<IEmailService, EmailService>();
+
 
 
 // Add JWT Authentication

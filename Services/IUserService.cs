@@ -19,5 +19,7 @@ namespace EVChargingApi.Services
         Task<(bool Success, string Message)> CreateOperatorAndAssignStationsAsync(CreateOperationalUserDto userDto);
         Task<(bool Success, string Message)> DeleteEVOwnerAsync(string nic);
 
+        Task<(bool Success, string Message)> CreateOwnerByAdminAsync(AdminCreateEVOwnerDto ownerDto);
+
     }
 }
