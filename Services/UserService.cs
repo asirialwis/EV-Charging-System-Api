@@ -5,6 +5,8 @@ using EVChargingApi.Dto;
 using EVChargingApi.Data.Repositories;
 using EVChargingSystem.WebAPI.Data.Dtos;
 using MongoDB.Driver;
+using MongoDB.Bson;
+using EVChargingSystem.WebAPI.Utils;
 
 namespace EVChargingSystem.WebAPI.Services
 {
@@ -14,12 +16,14 @@ namespace EVChargingSystem.WebAPI.Services
         private readonly IUserRepository _userRepository;
         private readonly IEVOwnerProfileRepository _profileRepository;
         private readonly IChargingStationRepository _stationRepository;
+        private readonly IEmailService _emailService;
 
-        public UserService(IUserRepository userRepository, IEVOwnerProfileRepository profileRepository, IChargingStationRepository stationRepository)
+        public UserService(IUserRepository userRepository, IEVOwnerProfileRepository profileRepository, IChargingStationRepository stationRepository, IEmailService emailService)
         {
             _userRepository = userRepository;
             _profileRepository = profileRepository;
             _stationRepository = stationRepository;
+            _emailService = emailService;
         }
 
         public async Task<(User? User, string? ErrorMessage)> AuthenticateAsync(string email, string password)
@@ -251,7 +255,7 @@ namespace EVChargingSystem.WebAPI.Services
                 return new EVOwnerProfileDto
                 {
                     Nic = profile.Nic,
-                    Email = user?.Email ?? "N/A", // Use "N/A" if user record is missing
+                    Email = user?.Email ?? "N/A", 
                     FullName = profile.FullName,
                     Phone = profile.Phone,
                     Address = profile.Address,
@@ -325,7 +329,7 @@ namespace EVChargingSystem.WebAPI.Services
             // 4. Final check and response
             if (profileDeleteSuccess && userDeleteSuccess)
             {
-                
+
                 return (true, "EV Owner account and profile successfully deleted.");
             }
             else
@@ -333,6 +337,75 @@ namespace EVChargingSystem.WebAPI.Services
                 // Handle partial failure (e.g., log error and alert admin)
                 return (false, "Deletion failed for one or more linked documents.");
             }
+        }
+
+
+
+
+        public async Task<(bool Success, string Message)> CreateOwnerByAdminAsync(AdminCreateEVOwnerDto ownerDto)
+        {
+            // 1. Validation Checks (Email and NIC uniqueness)
+            var existingUser = await _userRepository.FindByEmailAsync(ownerDto.Email);
+            if (existingUser != null) return (false, "Registration failed. Email already exists.");
+
+            var existingProfile = await _profileRepository.FindByNicAsync(ownerDto.Nic);
+            if (existingProfile != null) return (false, "Registration failed. NIC already exists.");
+
+            // 2. Generate Secure Password
+            string tempPassword = PasswordGenerator.GenerateTemporaryPassword();
+
+            // 3. Create the User document (using the generated password)
+            var user = new User
+            {
+                Email = ownerDto.Email,
+                Password = tempPassword, // Store the generated password
+                Role = "EVOwner",
+                Status = "Active",
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            await _userRepository.CreateAsync(user); // User.Id is populated here
+
+            // 4. Create the EVOwnerProfile document
+            var profile = new EVOwnerProfile
+            {
+                UserId = new ObjectId(user.Id),
+                Nic = ownerDto.Nic,
+                FullName = ownerDto.FullName,
+                Phone = ownerDto.Phone,
+                Address = ownerDto.Address,
+                VehicleModel = ownerDto.VehicleModel,
+                LicensePlate = ownerDto.LicensePlate,
+                Status = "Active",
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            await _profileRepository.CreateAsync(profile);
+
+            // 5. CRITICAL: Email the temporary password
+            try
+            {
+
+                await _emailService.SendTemporaryPasswordAsync(ownerDto.Email, tempPassword);
+
+
+                return (true, "Account created successfully and notification emailed.");
+            }
+            catch (MailKit.Security.AuthenticationException ex)
+            {
+                // Log the specific authentication failure details for debugging
+                Console.WriteLine($"SMTP Authentication Failed: {ex.Message}");
+                // Return a clean success message for the account creation
+                return (true, "Account created, but email notification failed. Password must be manually given.");
+            }
+            catch (Exception ex)
+            {
+                // Log general connection/protocol errors
+                Console.WriteLine($"Email sending failed: {ex.GetType().Name} - {ex.Message}");
+                return (true, "Account created, but email notification failed. Password must be manually given.");
+            }
+
+            return (true, "Account created. Temporary password emailed to EV Owner.");
         }
 
     }
