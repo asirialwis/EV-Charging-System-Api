@@ -7,6 +7,7 @@ using EVChargingSystem.WebAPI.Data.Dtos;
 using MongoDB.Driver;
 using MongoDB.Bson;
 using EVChargingSystem.WebAPI.Utils;
+using static BCrypt.Net.BCrypt;
 
 namespace EVChargingSystem.WebAPI.Services
 {
@@ -28,10 +29,10 @@ namespace EVChargingSystem.WebAPI.Services
 
         public async Task<(User? User, string? ErrorMessage)> AuthenticateAsync(string email, string password)
         {
-            var user = await _userRepository.FindByEmailAndPasswordAsync(email, password);
+            var user = await _userRepository.FindByEmailAsync(email);
 
             // Check 1: Invalid Credentials (Credentials failed)
-            if (user == null)
+            if (user == null || !BCrypt.Net.BCrypt.Verify(password, user.Password))
             {
                 return (null, "Invalid email or password.");
             }
@@ -49,6 +50,11 @@ namespace EVChargingSystem.WebAPI.Services
 
         public async Task CreateAsync(User user)
         {
+            string hashedPassword = BCrypt.Net.BCrypt.HashPassword(user.Password);
+
+            // 2. Overwrite the plaintext password with the hash before saving
+            user.Password = hashedPassword;
+
             // The service calls the repository's create method
             await _userRepository.CreateAsync(user);
         }
@@ -274,11 +280,13 @@ namespace EVChargingSystem.WebAPI.Services
 
         public async Task<(bool Success, string Message)> CreateOperatorAndAssignStationsAsync(CreateOperationalUserDto userDto)
         {
+            string hashedPassword = BCrypt.Net.BCrypt.HashPassword(userDto.Password);
+
             // 1. Create the new User (Operator/Backoffice)
             var user = new User
             {
                 Email = userDto.Email,
-                Password = userDto.Password,
+                Password = hashedPassword,
                 Role = userDto.Role,
                 FullName = userDto.FullName,
                 Phone = userDto.Phone,
@@ -354,11 +362,13 @@ namespace EVChargingSystem.WebAPI.Services
             // 2. Generate Secure Password
             string tempPassword = PasswordGenerator.GenerateTemporaryPassword();
 
+            string hashedPassword = BCrypt.Net.BCrypt.HashPassword(tempPassword);
+
             // 3. Create the User document (using the generated password)
             var user = new User
             {
                 Email = ownerDto.Email,
-                Password = tempPassword, // Store the generated password
+                Password = hashedPassword, // Store the generated password
                 Role = "EVOwner",
                 Status = "Active",
                 CreatedAt = DateTime.UtcNow,
