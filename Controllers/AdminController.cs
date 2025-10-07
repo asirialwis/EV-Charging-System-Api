@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using EVChargingSystem.WebAPI.Services;
 using System.Threading.Tasks;
+using EVChargingSystem.WebAPI.Data.Dtos;
+using EVChargingApi.Services;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -10,11 +12,13 @@ public class AdminController : ControllerBase
 {
     private readonly IBookingService _bookingService;
     private readonly IDashboardService _dashboardService;
+    private readonly IUserService _userService;
 
-    public AdminController(IBookingService bookingService, IDashboardService dashboardService)
+    public AdminController(IBookingService bookingService, IDashboardService dashboardService, IUserService userService)
     {
         _bookingService = bookingService;
         _dashboardService = dashboardService;
+        _userService = userService;
     }
 
     [HttpPost("approve-booking/{bookingId}")]
@@ -44,6 +48,23 @@ public class AdminController : ControllerBase
     {
         var locations = await _dashboardService.GetActiveStationLocationsAsync();
         return Ok(locations);
+    }
+
+
+    [HttpPost("create-evowner")]
+    public async Task<IActionResult> CreateEVOwnerByAdmin([FromBody] AdminCreateEVOwnerDto ownerDto)
+    {
+        // Admin must not be able to set the role or password
+        // The DTO ensures the password is not provided, and the service sets the role.
+
+        var (success, message) = await _userService.CreateOwnerByAdminAsync(ownerDto);
+
+        if (!success)
+        {
+            return BadRequest(new { Message = message });
+        }
+
+        return Ok(new { Message = message });
     }
 
 

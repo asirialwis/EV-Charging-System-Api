@@ -7,59 +7,244 @@ using System.Threading.Tasks;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "EVOwner")] // Only EV Owners can create bookings
-public class BookingsController : ControllerBase
+[Authorize]
+public class BookingController : ControllerBase
 {
     private readonly IBookingService _bookingService;
 
-    public BookingsController(IBookingService bookingService)
+    public BookingController(IBookingService bookingService)
     {
         _bookingService = bookingService;
     }
 
-    [HttpPost]
-    public async Task<IActionResult> CreateBooking([FromBody] CreateBookingDto bookingDto)
+    private string GetUserId()
     {
-        // Get the EV Owner ID from the JWT token (Claim type "id")
-        var evOwnerId = User.FindFirst("id")?.Value;
-        if (evOwnerId == null) return Unauthorized("Invalid token: User ID not found.");
-
-        bookingDto.EVOwnerId = evOwnerId; // Attach the authenticated user's ID
-
-        var success = await _bookingService.CreateBookingAsync(bookingDto);
-
-        if (!success)
-        {
-            return Conflict("Booking conflict: The requested time slot is full or invalid.");
-        }
-
-        return Ok(new { Message = "Booking successfully created and is pending approval." });
+        return User.FindFirst("id")?.Value ?? throw new UnauthorizedAccessException("User ID not found in token.");
     }
 
-
-
-
-    [HttpGet("available-slots")]
-    [Authorize]
-    public async Task<IActionResult> GetAvailableSlots(
-    [FromQuery] string stationId,
-    [FromQuery] string slotType,
-    [FromQuery] DateTime date) // This correctly receives the parameter
+    private string GetUserRole()
     {
-        if (string.IsNullOrWhiteSpace(stationId) || (slotType != "AC" && slotType != "DC") || date == DateTime.MinValue)
+        return User.FindFirst("role")?.Value ?? throw new UnauthorizedAccessException("User role not found in token.");
+    }
+
+    [HttpPost("check-availability")]
+    [Authorize(Roles = "EVOwner,Backoffice,StationOperator")]
+    public async Task<IActionResult> CheckAvailability([FromBody] AvailabilityRequestDto request)
+    {
+        try
         {
-            return BadRequest("Missing or invalid StationId, SlotType (AC/DC), or Date.");
-        }
+            var userRole = GetUserRole();
+            var result = await _bookingService.GetAvailableSlotIdsAsync(request, userRole);
 
-        // Enforcement of Assignment Requirement: Reservation date must be today or within the next 7 days
-        if (date.Date > DateTime.UtcNow.Date.AddDays(7) || date.Date < DateTime.UtcNow.Date)
+            return Ok(result);
+        }
+        catch (UnauthorizedAccessException ex)
         {
-            return BadRequest("Reservation date must be today or within the next 7 days.");
+            return Unauthorized(ex.Message);
         }
+    }
 
-        // Now, the service is called with the specific date received from the client.
-        var availableSlots = await _bookingService.GetAvailableSlotsAsync(stationId, slotType, date.Date);
+    [HttpPost]
+    [Authorize(Roles = "EVOwner,Backoffice,StationOperator")]
+    public async Task<IActionResult> CreateBooking([FromBody] CreateBookingDto bookingDto)
+    {
+        try
+        {
+            var userId = GetUserId();
+            var userRole = GetUserRole();
 
-        return Ok(availableSlots);
+            
+            if (userRole == "EVOwner")
+            {
+                bookingDto.EVOwnerId = userId;
+            }
+            else if (string.IsNullOrEmpty(bookingDto.EVOwnerId))
+            {
+                return BadRequest("EVOwnerId is required when creating booking for another user.");
+            }
+
+            var success = await _bookingService.CreateBookingByRoleAsync(bookingDto, userRole, userId);
+
+            if (!success)
+            {
+                return BadRequest("Failed to create booking. Please check station availability and booking constraints.");
+            }
+
+            var message = userRole == "EVOwner" 
+                ? "Booking successfully created and is pending approval." 
+                : "Booking successfully created and approved.";
+
+            return Ok(new { Message = message });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(ex.Message);
+        }
+    }
+
+    [HttpGet("{id}")]
+    [Authorize(Roles = "EVOwner,Backoffice,StationOperator")]
+    public async Task<IActionResult> GetBookingById(string id)
+    {
+        try
+        {
+            var userId = GetUserId();
+            var userRole = GetUserRole();
+
+            var booking = await _bookingService.GetBookingByIdAsync(id, userId, userRole);
+
+            if (booking == null)
+            {
+                return NotFound("Booking not found or you don't have permission to view it.");
+            }
+
+            return Ok(booking);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(ex.Message);
+        }
+    }
+
+    [HttpGet("my-bookings")]
+    [Authorize(Roles = "EVOwner")]
+    public async Task<IActionResult> GetMyBookings([FromQuery] BookingFilterDto filter)
+    {
+        try
+        {
+            var evOwnerId = GetUserId();
+            var result = await _bookingService.GetBookingsForEVOwnerAsync(evOwnerId, filter);
+
+            return Ok(result);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(ex.Message);
+        }
+    }
+
+    [HttpGet("station/{stationId}")]
+    [Authorize(Roles = "StationOperator")]
+    public async Task<IActionResult> GetBookingsByStation(string stationId, [FromQuery] BookingFilterDto filter)
+    {
+        try
+        {
+            var result = await _bookingService.GetBookingsForStationAsync(stationId, filter);
+            return Ok(result);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(ex.Message);
+        }
+    }
+
+    [HttpGet("all")]
+    [Authorize(Roles = "Backoffice")]
+    public async Task<IActionResult> GetAllBookings([FromQuery] BookingFilterDto filter)
+    {
+        try
+        {
+            var result = await _bookingService.GetAllBookingsAsync(filter);
+            return Ok(result);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(ex.Message);
+        }
+    }
+
+    [HttpPut("{id}")]
+    [Authorize(Roles = "EVOwner,Backoffice,StationOperator")]
+    public async Task<IActionResult> UpdateBooking(string id, [FromBody] UpdateBookingDto dto)
+    {
+        try
+        {
+            var userId = GetUserId();
+            var userRole = GetUserRole();
+
+            var success = await _bookingService.UpdateBookingAsync(id, dto, userRole, userId);
+
+            if (!success)
+            {
+                return BadRequest("Failed to update booking. Please check constraints and permissions.");
+            }
+
+            var message = userRole == "EVOwner" 
+                ? "Booking updated successfully and is pending approval." 
+                : "Booking updated successfully and approved.";
+
+            return Ok(new { Message = message });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(ex.Message);
+        }
+    }
+
+    [HttpPost("{id}/approve")]
+    [Authorize(Roles = "Backoffice,StationOperator")] 
+    public async Task<IActionResult> ApproveBooking(string id)
+    {
+        try
+        {
+            (bool success, string qrCode, string message) = await _bookingService.ApproveBookingAsync(id);
+
+            if (!success)
+            {
+                return BadRequest(new { Message = message });
+            }
+
+            return Ok(new { Message = message, QRCodeBase64 = qrCode });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(ex.Message);
+        }
+    }
+
+    [HttpDelete("{id}")]
+    [Authorize(Roles = "EVOwner,Backoffice,StationOperator")]
+    public async Task<IActionResult> CancelBooking(string id)
+    {
+        try
+        {
+            var userId = GetUserId();
+            var userRole = GetUserRole();
+
+            var success = await _bookingService.CancelBookingAsync(id, userId, userRole);
+
+            if (!success)
+            {
+                return BadRequest("Failed to cancel booking. Please check constraints and permissions.");
+            }
+
+            return Ok(new { Message = "Booking cancelled successfully." });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(ex.Message);
+        }
+    }
+
+    [HttpDelete("{id}/permanent")]
+    [Authorize(Roles = "Backoffice,StationOperator")]
+    public async Task<IActionResult> DeleteBooking(string id)
+    {
+        try
+        {
+            var userRole = GetUserRole();
+            var success = await _bookingService.DeleteBookingAsync(id, userRole);
+
+            if (!success)
+            {
+                return BadRequest("Failed to delete booking. Only completed or cancelled bookings can be deleted.");
+            }
+
+            return Ok(new { Message = "Booking deleted successfully." });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(ex.Message);
+        }
     }
 }
