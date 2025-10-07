@@ -14,10 +14,7 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             _users = context.GetCollection<User>("Users");
         }
 
-        public async Task<User> FindByEmailAndPasswordAsync(string email, string password)
-        {
-            return await _users.Find(u => u.Email == email && u.Password == password).FirstOrDefaultAsync();
-        }
+        
 
         public async Task CreateAsync(User user)
         {
