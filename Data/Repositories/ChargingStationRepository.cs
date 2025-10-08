@@ -136,5 +136,23 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             // Use FirstOrDefaultAsync() because the business rule enforces only one result.
             return await _stations.Find(filter).FirstOrDefaultAsync();
         }
+
+        public async Task<bool> AddOperatorToStationAsync(string assignedStationId, string id)
+        {
+            // Validate operator id
+            if (!ObjectId.TryParse(id, out var operatorObjectId)) return false;
+
+            // Filter by station string id
+            var filter = Builders<ChargingStation>.Filter.Eq(s => s.Id, assignedStationId);
+
+            // Push operator ObjectId into StationOperatorIds array and update timestamp
+            var update = Builders<ChargingStation>.Update
+                .Push(s => s.StationOperatorIds, operatorObjectId)
+                .Set(s => s.UpdatedAt, DateTime.UtcNow);
+
+            var result = await _stations.UpdateOneAsync(filter, update);
+
+            return result.ModifiedCount == 1;
+        }
     }
 }
