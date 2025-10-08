@@ -91,11 +91,13 @@ namespace EVChargingSystem.WebAPI.Services
             var existingProfile = await _profileRepository.FindByNicAsync(userDto.Nic);
             if (existingProfile != null) return false;
 
+             string hashedPassword = BCrypt.Net.BCrypt.HashPassword(userDto.Password);
+
             // 3. Create the User document
             var user = new User
             {
                 Email = userDto.Email,
-                Password = userDto.Password,
+                Password = hashedPassword,
                 Role = "EVOwner"
             };
             await _userRepository.CreateAsync(user);

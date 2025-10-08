@@ -60,7 +60,6 @@ public async Task<IActionResult> Login([FromBody] LoginRequestDto request)
     {
         Token = token,
         Role = user.Role,
-        Username = user.Email,
         FullName = user.FullName,
         
         // These fields are null unless specifically populated for the Station Operator role
