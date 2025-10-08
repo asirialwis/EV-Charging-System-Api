@@ -42,7 +42,7 @@ namespace EVChargingSystem.WebAPI.Data.Dtos
         public string Status { get; set; }
 
         public string AdditionalNotes { get; set; }
-          public List<SimpleOperatorDto> AssignedOperators { get; set; } = new List<SimpleOperatorDto>();
+        public List<SimpleOperatorDto> AssignedOperators { get; set; } = new List<SimpleOperatorDto>();
         public List<SimpleBookingDto> UpcomingBookings { get; set; } = new List<SimpleBookingDto>();
     }
 }
