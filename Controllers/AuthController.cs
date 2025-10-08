@@ -39,25 +39,36 @@ public class AuthController : ControllerBase
         return Ok(new { Message = "EV Owner registered successfully." });
     }
 
+    
     [HttpPost("login")]
-    public async Task<IActionResult> Login([FromBody] LoginRequestDto request)
+public async Task<IActionResult> Login([FromBody] LoginRequestDto request)
+{
+    // Deconstruct the simplified Tuple result
+    var (user, errorMessage, assignedStationId, stationName) = await _userService.AuthenticateAsync(request.Email, request.Password);
+
+    // Check if the service returned an error
+    if (user == null)
     {
-        // Deconstruct the Tuple result
-        var (user, errorMessage) = await _userService.AuthenticateAsync(request.Email, request.Password);
-
-        // Check if the service returned an error (User is null)
-        if (user == null)
-        {
-            // Return 401 Unauthorized with the specific error message
-            // If credentials failed, errorMessage is "Invalid email or password."
-            // If deactivated, errorMessage is "Account is currently deactivated..."
-            return Unauthorized(errorMessage);
-        }
-
-        // Authentication successful
-        var token = GenerateJwtToken(user);
-        return Ok(new { Token = token, Role = user.Role });
+        return Unauthorized(errorMessage);
     }
+
+    // Authentication successful
+    var token = GenerateJwtToken(user);
+    
+    // CRITICAL STEP: Construct the final response DTO
+    var response = new LoginResponseDto
+    {
+        Token = token,
+        Role = user.Role,
+        FullName = user.FullName,
+        
+        // These fields are null unless specifically populated for the Station Operator role
+        AssignedStationId = assignedStationId,
+        AssignedStationName = stationName
+    };
+
+    return Ok(response);
+}
 
 
      [HttpPost("create-operational-user")]

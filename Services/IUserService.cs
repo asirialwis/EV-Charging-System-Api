@@ -6,7 +6,7 @@ namespace EVChargingApi.Services
 {
     public interface IUserService
     {
-        Task<(User? User, string? ErrorMessage)> AuthenticateAsync(string email, string password);
+        Task<(User? User, string? ErrorMessage, string? AssignedStationId, string? AssignedStationName)> AuthenticateAsync(string email, string password);
         Task CreateAsync(User user);
 
         Task<bool> RegisterEVOwnerAsync(RegisterUserDto userDto);
