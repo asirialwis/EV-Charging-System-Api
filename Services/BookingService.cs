@@ -20,17 +20,20 @@ namespace EVChargingSystem.WebAPI.Services
         private readonly IChargingStationRepository _stationRepository;
         private readonly IEVOwnerProfileRepository _evOwnerProfileRepository;
         private readonly IUserRepository _userRepository;
+        private readonly IEVOwnerProfileRepository _profileRepository;
 
         public BookingService(
-            IBookingRepository bookingRepository, 
+            IBookingRepository bookingRepository,
             IChargingStationRepository stationRepository,
             IEVOwnerProfileRepository evOwnerProfileRepository,
-            IUserRepository userRepository)
+            IUserRepository userRepository,
+            IEVOwnerProfileRepository profileRepository)
         {
             _bookingRepository = bookingRepository;
             _stationRepository = stationRepository;
             _evOwnerProfileRepository = evOwnerProfileRepository;
             _userRepository = userRepository;
+            _profileRepository = profileRepository;
         }
 
         /**
@@ -92,7 +95,7 @@ namespace EVChargingSystem.WebAPI.Services
             {
                 IsAvailable = availableSlotIds.Any(),
                 AvailableSlotIds = availableSlotIds,
-                Message = availableSlotIds.Any() 
+                Message = availableSlotIds.Any()
                     ? $"Found {availableSlotIds.Count} available {request.SlotType} slots."
                     : $"No available {request.SlotType} slots for the selected time period."
             };
@@ -413,7 +416,7 @@ namespace EVChargingSystem.WebAPI.Services
             };
         }
 
-        
+
 
         private async Task<BookingResponseDto?> MapToBookingResponseDto(Booking booking)
         {
@@ -421,7 +424,7 @@ namespace EVChargingSystem.WebAPI.Services
             {
                 // Get EV Owner profile
                 var evOwnerProfile = await _evOwnerProfileRepository.FindByUserIdAsync(booking.EVOwnerId.ToString());
-                
+
                 // Get station details
                 var station = await _stationRepository.FindByIdAsync(booking.StationId);
 
@@ -455,5 +458,56 @@ namespace EVChargingSystem.WebAPI.Services
                 return null;
             }
         }
+        
+
+
+
+
+        public async Task<OperatorBookingDetailDto?> GetFullBookingDetailsForOperatorAsync(ObjectId bookingId)
+{
+    // IST/SLST Offset
+    TimeSpan istOffset = TimeSpan.FromHours(5.5);
+
+    // 1. Fetch the core Booking document
+    var booking = await _bookingRepository.FindByIdAsync(bookingId);
+    if (booking == null) return null;
+
+    // 2. Fetch the EV Owner Profile (using the EVOwnerId from the booking)
+    var profile = await _profileRepository.FindByUserIdAsync(booking.EVOwnerId.ToString());
+
+    // 3. Fetch the Charging Station details (using the StationId from the booking)
+    // You need a FindByIdAsync method in IChargingStationRepository for this.
+    var station = await _stationRepository.FindByIdAsync(booking.StationId); 
+
+    // If critical data (Profile or Station) is missing, fail gracefully
+    if (profile == null || station == null) 
+    {
+        // Consider logging this as a data integrity error
+        return null;
+    }
+
+    // 4. Map and return the combined DTO
+    return new OperatorBookingDetailDto
+    {
+        BookingId = booking.Id,
+        SlotType = booking.SlotType,
+        SlotId = booking.SlotId,
+        Status = booking.Status,
+        
+        // Convert UTC time to local IST/SLST time for the operator
+        StartTimeLocal = booking.StartTime.Add(istOffset),
+        EndTimeLocal = booking.EndTime.Add(istOffset),
+
+        // Mapped Owner Details
+        EVOwnerFullName = profile.FullName,
+        NIC = profile.Nic,
+        VehicleModel = profile.VehicleModel,
+        LicensePlate = profile.LicensePlate,
+
+        // Mapped Station Details
+        // StationId = station.Id,
+        StationName = station.StationName
+    };
+}
     }
 }

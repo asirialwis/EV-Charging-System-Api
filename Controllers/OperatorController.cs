@@ -25,7 +25,8 @@ public class OperatorController : ControllerBase
             return BadRequest("Invalid QR code payload (Booking ID).");
         }
 
-        var booking = await _bookingService.GetBookingDetails(id); 
+        var booking = await _bookingService.GetFullBookingDetailsForOperatorAsync(id); 
+         
         
         // Validation check
         if (booking == null || booking.Status != "Approved") // Only approved bookings can be validated
