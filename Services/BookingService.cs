@@ -342,7 +342,7 @@ namespace EVChargingSystem.WebAPI.Services
             {
                 // Check if operator is assigned to this station
                 var user = await _userRepository.FindByIdAsync(userId);
-                if (user == null || !user.AssignedStations.Contains(booking.StationId.ToString()))
+                if (user == null || string.IsNullOrEmpty(user.AssignedStationId) || user.AssignedStationId != booking.StationId.ToString())
                 {
                     return null; // Operator can only see bookings for their assigned stations
                 }
