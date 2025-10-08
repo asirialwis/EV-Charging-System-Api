@@ -8,20 +8,18 @@ namespace EVChargingApi.Data.Models
     {
         [BsonId]
         [BsonRepresentation(BsonType.ObjectId)]
-        public string Id { get; set; }
-
-        public string Email { get; set; }
-        public string Password { get; set; }
-        public string Role { get; set; } // "Backoffice", "StationOperator", "EVOwner"
-
-        public string FullName { get; set; }
-
-        public string Phone { get; set; }
+        public string Id { get; set; } = ObjectId.GenerateNewId().ToString();
+       
+        public required string Email { get; set; }
+        public required string Password { get; set; }
+        public required string Role { get; set; }
+        public required string FullName { get; set; }
+        public string? Phone { get; set; }
 
         [BsonRepresentation(BsonType.ObjectId)]
-        public List<string> AssignedStations { get; set; } = new List<string>(); // For Station Operators, link to their station
-
-        public string Status { get; set; } 
+        public string? AssignedStationId { get; set; } 
+        public string? Status { get; set; }
+        
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
     }
