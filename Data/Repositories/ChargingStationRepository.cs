@@ -96,20 +96,20 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
 
             return await pipeline.ToListAsync();
         }
-        
 
-  public async Task<bool> AddOperatorToStationsAsync(List<string> stationIds, string newOperatorId)
+
+        public async Task<bool> AddOperatorToStationsAsync(List<string> stationIds, string newOperatorId)
         {
             // 1. Convert NEW Operator ID to ObjectId 
             if (!ObjectId.TryParse(newOperatorId, out var operatorObjectId)) return false;
 
             // CRITICAL FIX: Ensure the list of station IDs is not empty before proceeding
-            if (!stationIds.Any()) return false; 
+            if (!stationIds.Any()) return false;
 
             // 2. Define the filter: Select all stations whose string ID is in the provided list
-      
+
             var filter = Builders<ChargingStation>.Filter.In(s => s.Id, stationIds);
-            
+
             // 3. Define the update: Atomically push the new Operator ID to the StationOperatorIds array
             var update = Builders<ChargingStation>.Update
                 .Push(s => s.StationOperatorIds, operatorObjectId) // operatorObjectId is correctly BsonObjectId
@@ -120,6 +120,21 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
 
             // Check that at least one station was modified
             return result.ModifiedCount > 0;
+        }
+
+
+        public async Task<ChargingStation?> FindStationByOperatorIdAsync(string operatorId)
+        {
+            // CRITICAL STEP: Convert the string operatorId to an ObjectId
+            if (!ObjectId.TryParse(operatorId, out var objectId)) return null;
+
+            // Filter: Find the single station where the StationOperatorIds array CONTAINS the operator's ID.
+            // The Many-to-One rule is enforced by the assumption that the operator's ID
+            // will only appear once across the entire ChargingStation collection.
+            var filter = Builders<ChargingStation>.Filter.AnyEq(s => s.StationOperatorIds, objectId);
+
+            // Use FirstOrDefaultAsync() because the business rule enforces only one result.
+            return await _stations.Find(filter).FirstOrDefaultAsync();
         }
     }
 }

@@ -27,25 +27,44 @@ namespace EVChargingSystem.WebAPI.Services
             _emailService = emailService;
         }
 
-        public async Task<(User? User, string? ErrorMessage)> AuthenticateAsync(string email, string password)
+        public async Task<(User? User, string? ErrorMessage, string? AssignedStationId, string? AssignedStationName)> AuthenticateAsync(string email, string password)
         {
+            // 1. RETRIEVE HASH: Find the user by email only to get the stored hash.
             var user = await _userRepository.FindByEmailAsync(email);
 
-            // Check 1: Invalid Credentials (Credentials failed)
+            // Check 1: Invalid Credentials (Existence OR Password Mismatch)
+            // If user is null OR the plaintext password does NOT verify against the hash, fail.
             if (user == null || !BCrypt.Net.BCrypt.Verify(password, user.Password))
             {
-                return (null, "Invalid email or password.");
+                return (null, "Invalid email or password.", null, null);
             }
 
             // Check 2: CRITICAL SECURITY CHECK (Account Status)
             if (user.Status == "Deactivated")
             {
                 // Return null User and the specific error message
-                return (null, "Account is currently deactivated. Please contact backoffice support.");
+                return (null, "Account is currently deactivated. Please contact backoffice support.", null, null);
             }
 
-            // 3. Authentication successful
-            return (user, null);
+            // 3. OPERATOR LOGIC: Fetch the single assigned station
+            if (user.Role == "StationOperator")
+            {
+                // Fetch the single station assigned to this operator.
+                var station = await _stationRepository.FindStationByOperatorIdAsync(user.Id);
+
+                if (station == null)
+                {
+                    // Operator is logged in but unassigned. Allow login, but provide empty station data.
+                    // Returning the user ensures the token is generated.
+                    return (user, null, null, null);
+                }
+
+                // Success: Return the user, null error, the station ID, and the station Name
+                return (user, null, station.Id, station.StationName);
+            }
+
+            // 4. Authentication successful for Backoffice or EVOwner (no station data needed)
+            return (user, null, null, null);
         }
 
         public async Task CreateAsync(User user)
@@ -261,7 +280,7 @@ namespace EVChargingSystem.WebAPI.Services
                 return new EVOwnerProfileDto
                 {
                     Nic = profile.Nic,
-                    Email = user?.Email ?? "N/A", 
+                    Email = user?.Email ?? "N/A",
                     FullName = profile.FullName,
                     Phone = profile.Phone,
                     Address = profile.Address,
