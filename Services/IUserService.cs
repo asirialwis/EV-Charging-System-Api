@@ -21,5 +21,7 @@ namespace EVChargingApi.Services
 
         Task<(bool Success, string Message)> CreateOwnerByAdminAsync(AdminCreateEVOwnerDto ownerDto);
 
+        Task<List<OperationalUserDto>> GetAllOperationalUsersAsync();
+
     }
 }

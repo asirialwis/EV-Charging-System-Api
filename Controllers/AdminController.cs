@@ -67,5 +67,11 @@ public class AdminController : ControllerBase
         return Ok(new { Message = message });
     }
 
+    [HttpGet("operational-users")]
+    public async Task<IActionResult> GetAllOperationalUsers()
+    {
+        var users = await _userService.GetAllOperationalUsersAsync();
+        return Ok(users);
+    }
 
 }
