@@ -440,5 +440,51 @@ namespace EVChargingSystem.WebAPI.Services
             }
         }
 
+        public async Task<List<OperationalUserDto>> GetAllOperationalUsersAsync()
+        {
+            // 1. Get all Backoffice users
+            var backofficeUsers = await _userRepository.GetUsersByRoleAsync("Backoffice");
+            
+            // 2. Get all StationOperator users
+            var operatorUsers = await _userRepository.GetUsersByRoleAsync("StationOperator");
+            
+            // 3. Combine both lists
+            var allOperationalUsers = backofficeUsers.Concat(operatorUsers).ToList();
+            
+            // 4. Get station information for operators
+            var stations = new Dictionary<string, string>(); // stationId -> stationName
+            
+            foreach (var operatorUser in operatorUsers)
+            {
+                if (operatorUser.AssignedStationId != null)
+                {
+                    var station = await _stationRepository.FindByIdAsync(new MongoDB.Bson.ObjectId(operatorUser.AssignedStationId));
+                    if (station != null)
+                    {
+                        stations[operatorUser.AssignedStationId] = station.StationName;
+                    }
+                }
+            }
+            
+            // 5. Map to DTOs
+            var result = allOperationalUsers.Select(user => new OperationalUserDto
+            {
+                Id = user.Id,
+                Email = user.Email,
+                FullName = user.FullName,
+                Phone = user.Phone,
+                Role = user.Role,
+                Status = user.Status,
+                AssignedStationId = user.AssignedStationId,
+                AssignedStationName = user.AssignedStationId != null && stations.ContainsKey(user.AssignedStationId) 
+                    ? stations[user.AssignedStationId] 
+                    : null,
+                CreatedAt = user.CreatedAt,
+                UpdatedAt = user.UpdatedAt
+            }).ToList();
+            
+            return result;
+        }
+
     }
 }
