@@ -1,4 +1,5 @@
-﻿using System;
+﻿//Utility card for the QR code generation
+using System;
 using QRCoder;
 
 namespace EVChargingSystem.WebAPI.Utils

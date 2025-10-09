@@ -1,3 +1,4 @@
+//business logic related to Users (Authentication, Registration, Profile Management, Admin Operations)
 using EVChargingApi.Services;
 using EVChargingSystem.WebAPI.Data.Repositories;
 using EVChargingApi.Data.Models;
@@ -26,7 +27,7 @@ namespace EVChargingSystem.WebAPI.Services
             _stationRepository = stationRepository;
             _emailService = emailService;
         }
-
+        // Method to authenticate a user and return user details along with assigned station info for operators
         public async Task<(User? User, string? ErrorMessage, string? AssignedStationId, string? AssignedStationName)> AuthenticateAsync(string email, string password)
         {
             // 1. RETRIEVE HASH: Find the user by email only to get the stored hash.
@@ -67,6 +68,7 @@ namespace EVChargingSystem.WebAPI.Services
             return (user, null, null, null);
         }
 
+        // Method to create a new user (used internally for registration and admin operations)
         public async Task CreateAsync(User user)
         {
             string hashedPassword = BCrypt.Net.BCrypt.HashPassword(user.Password);
@@ -91,7 +93,7 @@ namespace EVChargingSystem.WebAPI.Services
             var existingProfile = await _profileRepository.FindByNicAsync(userDto.Nic);
             if (existingProfile != null) return false;
 
-             string hashedPassword = BCrypt.Net.BCrypt.HashPassword(userDto.Password);
+            string hashedPassword = BCrypt.Net.BCrypt.HashPassword(userDto.Password);
 
             // 3. Create the User document
             var user = new User
@@ -121,7 +123,7 @@ namespace EVChargingSystem.WebAPI.Services
 
             return true;
         }
-
+        // Method to update an EV Owner profile with role-based access control and dynamic PATCH logic
         public async Task<bool> UpdateEVOwnerAsync(
            string nic,
            UpdateEVOwnerDto updateDto,
@@ -224,7 +226,7 @@ namespace EVChargingSystem.WebAPI.Services
             return await _profileRepository.PartialUpdateAsync(nic, combinedUpdate);
         }
 
-
+        // Method to fetch an EV Owner profile by UserId (used by EVOwner themselves)
         public async Task<EVOwnerProfileDto?> GetOwnerProfileAsync(string userId)
         {
             // 1. Fetch the Profile using the UserId from the JWT token
@@ -259,7 +261,7 @@ namespace EVChargingSystem.WebAPI.Services
             };
         }
 
-
+        // Method to fetch all EV Owner profiles with joined email (Admin use)
         public async Task<List<EVOwnerProfileDto>> GetAllEVOwnersAsync()
         {
             // 1. Fetch all profiles (contains NIC, UserId, FullName, Status, etc.)
@@ -299,7 +301,7 @@ namespace EVChargingSystem.WebAPI.Services
 
 
 
-
+        // Method to create a new operational user (Backoffice or StationOperator) and assign station if applicable
         public async Task<(bool Success, string Message)> CreateOperatorAndAssignStationsAsync(CreateOperationalUserDto userDto)
         {
             string hashedPassword = BCrypt.Net.BCrypt.HashPassword(userDto.Password);
@@ -327,7 +329,7 @@ namespace EVChargingSystem.WebAPI.Services
                 // Add the newly created User ID to the selected Station
                 var assignmentSuccess = await _stationRepository.AddOperatorToStationAsync(
                     userDto.AssignedStationId,
-                    user.Id 
+                    user.Id
                 );
 
                 // CRITICAL CHECK: If station assignment fails, log a warning but don't fail user creation, 
@@ -371,8 +373,7 @@ namespace EVChargingSystem.WebAPI.Services
         }
 
 
-
-
+        //create ev owners by admin
         public async Task<(bool Success, string Message)> CreateOwnerByAdminAsync(AdminCreateEVOwnerDto ownerDto)
         {
             // 1. Validation Checks (Email and NIC uniqueness)
@@ -440,20 +441,21 @@ namespace EVChargingSystem.WebAPI.Services
             }
         }
 
+        //get All operational users
         public async Task<List<OperationalUserDto>> GetAllOperationalUsersAsync()
         {
             // 1. Get all Backoffice users
             var backofficeUsers = await _userRepository.GetUsersByRoleAsync("Backoffice");
-            
+
             // 2. Get all StationOperator users
             var operatorUsers = await _userRepository.GetUsersByRoleAsync("StationOperator");
-            
+
             // 3. Combine both lists
             var allOperationalUsers = backofficeUsers.Concat(operatorUsers).ToList();
-            
+
             // 4. Get station information for operators
             var stations = new Dictionary<string, string>(); // stationId -> stationName
-            
+
             foreach (var operatorUser in operatorUsers)
             {
                 if (operatorUser.AssignedStationId != null)
@@ -465,7 +467,7 @@ namespace EVChargingSystem.WebAPI.Services
                     }
                 }
             }
-            
+
             // 5. Map to DTOs
             var result = allOperationalUsers.Select(user => new OperationalUserDto
             {
@@ -476,13 +478,13 @@ namespace EVChargingSystem.WebAPI.Services
                 Role = user.Role,
                 Status = user.Status,
                 AssignedStationId = user.AssignedStationId,
-                AssignedStationName = user.AssignedStationId != null && stations.ContainsKey(user.AssignedStationId) 
-                    ? stations[user.AssignedStationId] 
+                AssignedStationName = user.AssignedStationId != null && stations.ContainsKey(user.AssignedStationId)
+                    ? stations[user.AssignedStationId]
                     : null,
                 CreatedAt = user.CreatedAt,
                 UpdatedAt = user.UpdatedAt
             }).ToList();
-            
+
             return result;
         }
 

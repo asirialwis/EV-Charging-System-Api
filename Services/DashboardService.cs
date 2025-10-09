@@ -1,3 +1,4 @@
+//Dshboard related business logic
 using EVChargingSystem.WebAPI.Data.Dtos;
 using EVChargingSystem.WebAPI.Data.Repositories;
 using System.Threading.Tasks;
@@ -13,6 +14,7 @@ namespace EVChargingSystem.WebAPI.Services
             _dashboardRepository = dashboardRepository;
         }
 
+        // Get various dashboard metrics
         public async Task<DashboardMetricsDto> GetMetricsAsync()
         {
             // 1. Fetch Counts
@@ -49,7 +51,7 @@ namespace EVChargingSystem.WebAPI.Services
                 TodayCapacityPercentage = capacityPercentage
             };
         }
-
+        // Get locations of all active charging stations
         public async Task<List<ChargingStationLocationDto>> GetActiveStationLocationsAsync()
         {
             return await _dashboardRepository.GetActiveStationLocationsAsync();

@@ -1,3 +1,4 @@
+// This Authentication and Authorization code is relevant to the AdminController.cs file.user register and login handle within this controller. 
 using System.Security.Claims;
 using System.Text;
 using System.IdentityModel.Tokens.Jwt;
@@ -22,6 +23,7 @@ public class AuthController : ControllerBase
         _config = config;
     }
 
+// EV Owner self-registration
     [HttpPost("register")]
     public async Task<IActionResult> RegisterEVOwner([FromBody] RegisterUserDto userDto)
     {
@@ -39,7 +41,7 @@ public class AuthController : ControllerBase
         return Ok(new { Message = "EV Owner registered successfully." });
     }
 
-    
+    // User login for all roles
     [HttpPost("login")]
 public async Task<IActionResult> Login([FromBody] LoginRequestDto request)
 {
@@ -70,7 +72,7 @@ public async Task<IActionResult> Login([FromBody] LoginRequestDto request)
     return Ok(response);
 }
 
-
+    // Admin creates Backoffice or Station Operator accounts
      [HttpPost("create-operational-user")]
     [Authorize(Roles = "Backoffice")]
     public async Task<IActionResult> CreateOperationalUser([FromBody] CreateOperationalUserDto userDto)
@@ -91,6 +93,7 @@ public async Task<IActionResult> Login([FromBody] LoginRequestDto request)
         return Ok(new { Message = message });
     }
 
+// Helper method to generate JWT token
     private string GenerateJwtToken(User user)
     {
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]));

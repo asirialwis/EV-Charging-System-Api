@@ -1,3 +1,4 @@
+//DB logic for the Booking management
 using MongoDB.Driver;
 using EVChargingSystem.WebAPI.Data.Models;
 using EVChargingSystem.WebAPI.Data;
@@ -24,6 +25,7 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             _evOwnerProfiles = context.GetCollection<EVOwnerProfile>("EVOwnerProfiles");
         }
 
+        // Check for conflicting bookings based on overlap logic
         public async Task<long> CountConflictingBookingsAsync(
             ObjectId stationId,
             string slotType,
@@ -47,6 +49,7 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             return await _bookings.CountDocumentsAsync(filter);
         }
 
+        // Fetch all bookings for a specific station, slot type, and day
         public async Task<List<Booking>> GetApprovedBookingsForDayAsync(
             ObjectId stationId,
             string slotType,
@@ -79,13 +82,14 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             await _bookings.InsertOneAsync(booking);
         }
 
-
+        // Find booking by its string ID
         public async Task<Booking> FindByIdAsync(ObjectId bookingId)
         {
             // Note: MongoDB driver often handles string conversion, but this uses ObjectId for the filter
             return await _bookings.Find(b => b.Id == bookingId.ToString()).FirstOrDefaultAsync();
         }
 
+        // Update only the Status and UpdatedAt fields of a booking
         public async Task<bool> UpdateStatusAsync(ObjectId bookingId, string newStatus)
         {
             var filter = Builders<Booking>.Filter.Eq(b => b.Id, bookingId.ToString());
@@ -101,6 +105,7 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             return result.IsAcknowledged && result.ModifiedCount == 1;
         }
 
+        // Update both Status and QrCodeBase64 fields of a booking
         public async Task<bool> UpdateBookingAndQrCodeAsync(ObjectId bookingId, string newStatus, string qrCodeBase64)
         {
             var filter = Builders<Booking>.Filter.Eq(b => b.Id, bookingId.ToString());
@@ -116,6 +121,7 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             return result.IsAcknowledged && result.ModifiedCount == 1;
         }
         
+        // Check if there are any active (non-canceled, non-completed) bookings for a station
          public async Task<bool> HasActiveBookingsForStationAsync(ObjectId stationId)
         {
             var filter = Builders<Booking>.Filter.And(
@@ -133,10 +139,11 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             return count > 0;
         }
 
+        // Advanced filtering with pagination for EVOwner and Station
         public async Task<(List<Booking> Bookings, long TotalCount)> GetBookingsByEVOwnerIdAsync(ObjectId evOwnerId, BookingFilterDto filter)
         {
             var baseFilter = Builders<Booking>.Filter.Eq(b => b.EVOwnerId, evOwnerId);
-            
+
             // Apply status filter if provided
             if (!string.IsNullOrEmpty(filter.Status))
             {
@@ -144,7 +151,7 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             }
 
             var totalCount = await _bookings.CountDocumentsAsync(baseFilter);
-            
+
             var bookings = await _bookings
                 .Find(baseFilter)
                 .SortByDescending(b => b.CreatedAt)
@@ -155,10 +162,11 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             return (bookings, totalCount);
         }
 
+        // Advanced filtering with pagination for Station
         public async Task<(List<Booking> Bookings, long TotalCount)> GetBookingsByStationIdAsync(ObjectId stationId, BookingFilterDto filter)
         {
             var baseFilter = Builders<Booking>.Filter.Eq(b => b.StationId, stationId);
-            
+
             // Apply status filter if provided
             if (!string.IsNullOrEmpty(filter.Status))
             {
@@ -166,7 +174,7 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             }
 
             var totalCount = await _bookings.CountDocumentsAsync(baseFilter);
-            
+
             var bookings = await _bookings
                 .Find(baseFilter)
                 .SortByDescending(b => b.CreatedAt)
@@ -177,13 +185,14 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             return (bookings, totalCount);
         }
 
+        // Advanced filtering with pagination for Admin (all bookings)
         public async Task<(List<Booking> Bookings, long TotalCount)> GetAllBookingsAsync(BookingFilterDto filter)
         {
             var pipeline = new List<BsonDocument>();
-            
+
             // Match stage for basic filters
             var matchStage = new BsonDocument("$match", new BsonDocument());
-            
+
             // Apply status filter if provided
             if (!string.IsNullOrEmpty(filter.Status))
             {
@@ -238,6 +247,7 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             return (bookings, totalCount);
         }
 
+        // Generic update method for bookings
         public async Task<bool> UpdateBookingAsync(string bookingId, UpdateDefinition<Booking> update)
         {
             var filter = Builders<Booking>.Filter.Eq(b => b.Id, bookingId);
@@ -245,6 +255,7 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             return result.IsAcknowledged && result.ModifiedCount == 1;
         }
 
+        // Delete a booking by its ID
         public async Task<bool> DeleteBookingAsync(string bookingId)
         {
             var filter = Builders<Booking>.Filter.Eq(b => b.Id, bookingId);
@@ -252,6 +263,8 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             return result.IsAcknowledged && result.DeletedCount == 1;
         }
 
+        // Check if a specific slot is available for booking within a time range
+        // Exclude a specific booking ID when checking (useful for updates)
         public async Task<bool> CheckSlotAvailabilityAsync(ObjectId stationId, string slotId, DateTime start, DateTime end, string? excludeBookingId)
         {
             var filter = Builders<Booking>.Filter.And(
@@ -273,6 +286,8 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             return count == 0;
         }
 
+        // Get all booked slot IDs for a station and slot type within a time range
+        // Useful for determining available slots
         public async Task<List<string>> GetBookedSlotIdsAsync(ObjectId stationId, string slotType, DateTime start, DateTime end)
         {
             var filter = Builders<Booking>.Filter.And(

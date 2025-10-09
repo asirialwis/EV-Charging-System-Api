@@ -42,6 +42,7 @@ public class EVOwnersController : ControllerBase
     }
 
 
+    // Get EV Owner Profile (Used by Admin and Owner)
     [HttpGet("profile")]
     [Authorize(Roles = "EVOwner")]
     public async Task<IActionResult> GetOwnerProfile()
@@ -66,7 +67,7 @@ public class EVOwnersController : ControllerBase
         return Ok(profileDto);
     }
 
-
+    // Get all EV Owners (Admin and EVOwner themselves)
     [HttpGet]
     [Authorize(Roles = "Backoffice, EVOwner")]
     public async Task<IActionResult> GetAllEVOwners()
@@ -75,7 +76,7 @@ public class EVOwnersController : ControllerBase
         return Ok(owners);
     }
 
-
+    // Delete EV Owner (Admin only)
     [HttpDelete("profile/{nic}")] // Use a dedicated route segment for Admin deletes
     [Authorize(Roles = "Backoffice")] 
     public async Task<IActionResult> DeleteEVOwner(string nic)

@@ -1,3 +1,4 @@
+//Model for User management component
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 

@@ -1,3 +1,4 @@
+//Admin handles booking approvals and dashboard metrics
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using EVChargingSystem.WebAPI.Services;
@@ -21,6 +22,7 @@ public class AdminController : ControllerBase
         _userService = userService;
     }
 
+    // approve booking for EV owner
     [HttpPost("approve-booking/{bookingId}")]
     public async Task<IActionResult> ApproveBooking(string bookingId)
     {
@@ -36,6 +38,7 @@ public class AdminController : ControllerBase
         return Ok(new { Message = message, QRCodeBase64 = qrCode });
     }
 
+    //Fetch dashboard metrics
     [HttpGet("dashboard-metrics")]
     public async Task<IActionResult> GetDashboardMetrics()
     {
@@ -43,6 +46,7 @@ public class AdminController : ControllerBase
         return Ok(metrics);
     }
 
+    // Fetch active charging station locations
     [HttpGet("charging-stations/locations")]
     public async Task<IActionResult> GetStationLocations()
     {
@@ -50,7 +54,7 @@ public class AdminController : ControllerBase
         return Ok(locations);
     }
 
-
+    // Admin creates an EV Owner account
     [HttpPost("create-evowner")]
     public async Task<IActionResult> CreateEVOwnerByAdmin([FromBody] AdminCreateEVOwnerDto ownerDto)
     {
@@ -67,6 +71,7 @@ public class AdminController : ControllerBase
         return Ok(new { Message = message });
     }
 
+    // Admin fetches all operational users (Backoffice and Station Operators)
     [HttpGet("operational-users")]
     public async Task<IActionResult> GetAllOperationalUsers()
     {

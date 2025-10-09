@@ -1,3 +1,4 @@
+// This controller manages booking-related operations including creation, approval, updating, and cancellation of bookings.
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using EVChargingSystem.WebAPI.Data.Dtos;
@@ -17,16 +18,19 @@ public class BookingController : ControllerBase
         _bookingService = bookingService;
     }
 
+    // Helper methods to extract user info from JWT claims
     private string GetUserId()
     {
         return User.FindFirst("id")?.Value ?? throw new UnauthorizedAccessException("User ID not found in token.");
     }
 
+    // Extract user role from JWT claims
     private string GetUserRole()
     {
         return User.FindFirst("role")?.Value ?? throw new UnauthorizedAccessException("User role not found in token.");
     }
 
+    // Check availability of charging slots
     [HttpPost("check-availability")]
     [Authorize(Roles = "EVOwner,Backoffice,StationOperator")]
     public async Task<IActionResult> CheckAvailability([FromBody] AvailabilityRequestDto request)
@@ -43,7 +47,7 @@ public class BookingController : ControllerBase
             return Unauthorized(ex.Message);
         }
     }
-
+    // Create a new booking
     [HttpPost]
     [Authorize(Roles = "EVOwner,Backoffice,StationOperator")]
     public async Task<IActionResult> CreateBooking([FromBody] CreateBookingDto bookingDto)
@@ -82,6 +86,7 @@ public class BookingController : ControllerBase
         }
     }
 
+    // Get booking by ID with role-based access
     [HttpGet("{id}")]
     [Authorize(Roles = "EVOwner,Backoffice,StationOperator")]
     public async Task<IActionResult> GetBookingById(string id)
@@ -105,7 +110,7 @@ public class BookingController : ControllerBase
             return Unauthorized(ex.Message);
         }
     }
-
+    // Get bookings for the authenticated EV Owner
     [HttpGet("my-bookings")]
     [Authorize(Roles = "EVOwner")]
     public async Task<IActionResult> GetMyBookings([FromQuery] BookingFilterDto filter)
@@ -123,6 +128,7 @@ public class BookingController : ControllerBase
         }
     }
 
+    // Get bookings for a specific station (Station Operator only)
     [HttpGet("station/{stationId}")]
     [Authorize(Roles = "StationOperator")]
     public async Task<IActionResult> GetBookingsByStation(string stationId, [FromQuery] BookingFilterDto filter)
@@ -138,6 +144,7 @@ public class BookingController : ControllerBase
         }
     }
 
+    // Get all bookings (Backoffice only) with optional filtering
     [HttpGet("all")]
     [Authorize(Roles = "Backoffice")]
     public async Task<IActionResult> GetAllBookings([FromQuery] BookingFilterDto filter)
@@ -153,6 +160,7 @@ public class BookingController : ControllerBase
         }
     }
 
+        // Update an existing booking
     [HttpPut("{id}")]
     [Authorize(Roles = "EVOwner,Backoffice,StationOperator")]
     public async Task<IActionResult> UpdateBooking(string id, [FromBody] UpdateBookingDto dto)
@@ -181,6 +189,7 @@ public class BookingController : ControllerBase
         }
     }
 
+// Approve a booking (Backoffice and Station Operator)
     [HttpPost("{id}/approve")]
     [Authorize(Roles = "Backoffice,StationOperator")] 
     public async Task<IActionResult> ApproveBooking(string id)
@@ -202,6 +211,7 @@ public class BookingController : ControllerBase
         }
     }
 
+    // Cancel a booking (EVOwner can cancel their own, Backoffice and Station Operator can cancel any)
     [HttpDelete("{id}")]
     [Authorize(Roles = "EVOwner,Backoffice,StationOperator")]
     public async Task<IActionResult> CancelBooking(string id)
@@ -226,6 +236,7 @@ public class BookingController : ControllerBase
         }
     }
 
+// Permanently delete a booking (Backoffice and Station Operator only)
     [HttpDelete("{id}/permanent")]
     [Authorize(Roles = "Backoffice,StationOperator")]
     public async Task<IActionResult> DeleteBooking(string id)

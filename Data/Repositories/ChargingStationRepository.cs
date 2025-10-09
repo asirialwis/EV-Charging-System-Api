@@ -1,3 +1,4 @@
+// Repository for managing ChargingStation data
 using MongoDB.Driver;
 using EVChargingSystem.WebAPI.Data.Models;
 using EVChargingSystem.WebAPI.Data;
@@ -12,6 +13,7 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
         public ObjectId StationOperatorIds { get; set; }
     }
 
+
     public class ChargingStationRepository : IChargingStationRepository
     {
         private readonly IMongoCollection<ChargingStation> _stations;
@@ -22,12 +24,13 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             _stations = context.GetCollection<ChargingStation>("ChargingStations");
             _bookings = context.GetCollection<Booking>("Bookings");
         }
-
+        // Create a new charging station
         public async Task CreateAsync(ChargingStation station)
         {
             await _stations.InsertOneAsync(station);
         }
 
+        // Find a charging station by its ID
         public async Task<ChargingStation> FindByIdAsync(ObjectId stationId)
         {
             // Implementation to find the station by its ObjectId
@@ -35,22 +38,21 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
         }
 
 
-
-
+        // Get all unique operator IDs assigned to any station
+        // Returns a list of strings (ObjectId as string)
         public async Task<List<string>> GetAllAssignedOperatorIdsAsync()
         {
             // The pipeline result is IMongoAggregateQueryable<string>, which can be used with ToListAsync()
 
-            // --- FIX 2: Correct usage of var and pipeline definition ---
+
             var pipeline = _stations.Aggregate()
-                // 1. Match/Filter (Ensure array is not null before unwinding)
+
                 .Match(Builders<ChargingStation>.Filter.Ne(s => s.StationOperatorIds, null))
 
-                // 2. Unwind: Deconstructs the array. The output type is the UnwoundOperatorId class defined above.
+
                 .Unwind<ChargingStation, UnwoundOperatorId>(s => s.StationOperatorIds)
 
-                // 3. Project: Now, use the strongly-typed property of the unwound class
-                // Convert ObjectId to string here
+
                 .Project(u => u.StationOperatorIds.ToString());
 
 
@@ -60,12 +62,14 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
 
         }
 
+        // Get all charging stations
         public async Task<List<ChargingStation>> GetAllStationsAsync()
         {
             // Implementation to find ALL documents
             return await _stations.Find(_ => true).ToListAsync();
         }
 
+        // Get all active charging stations
         public async Task<List<ChargingStation>> GetActiveStationsAsync()
         {
             // Implementation to find ONLY documents where Status == "Active"
@@ -73,6 +77,7 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             return await _stations.Find(filter).ToListAsync();
         }
 
+        // Update a charging station by its ID
         public async Task<bool> PartialUpdateAsync(string stationId, UpdateDefinition<ChargingStation> updateDefinition)
         {
             var filter = Builders<ChargingStation>.Filter.Eq(s => s.Id, stationId);
@@ -83,6 +88,7 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             return result.ModifiedCount == 1;
         }
 
+        // Get upcoming bookings for a list of station IDs, limited per station
         public async Task<List<Booking>> GetUpcomingBookingsByStationIdsAsync(List<ObjectId> stationIds, int limitPerStation)
         {
             var filter = Builders<Booking>.Filter.In(b => b.StationId, stationIds) &
@@ -98,15 +104,17 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
         }
 
 
+        // Add a new operator to multiple stations atomically
+        // Returns true if at least one station was updated
         public async Task<bool> AddOperatorToStationsAsync(List<string> stationIds, string newOperatorId)
         {
             // 1. Convert NEW Operator ID to ObjectId 
             if (!ObjectId.TryParse(newOperatorId, out var operatorObjectId)) return false;
 
-            // CRITICAL FIX: Ensure the list of station IDs is not empty before proceeding
+
             if (!stationIds.Any()) return false;
 
-            // 2. Define the filter: Select all stations whose string ID is in the provided list
+
 
             var filter = Builders<ChargingStation>.Filter.In(s => s.Id, stationIds);
 
@@ -122,21 +130,21 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             return result.ModifiedCount > 0;
         }
 
-
+        // Find the single station assigned to a specific operator
         public async Task<ChargingStation?> FindStationByOperatorIdAsync(string operatorId)
         {
-            // CRITICAL STEP: Convert the string operatorId to an ObjectId
+
             if (!ObjectId.TryParse(operatorId, out var objectId)) return null;
 
-            // Filter: Find the single station where the StationOperatorIds array CONTAINS the operator's ID.
-            // The Many-to-One rule is enforced by the assumption that the operator's ID
-            // will only appear once across the entire ChargingStation collection.
+
             var filter = Builders<ChargingStation>.Filter.AnyEq(s => s.StationOperatorIds, objectId);
 
-            // Use FirstOrDefaultAsync() because the business rule enforces only one result.
+
             return await _stations.Find(filter).FirstOrDefaultAsync();
         }
 
+        // Add a new operator to a single station
+        // Returns true if the station was updated
         public async Task<bool> AddOperatorToStationAsync(string assignedStationId, string id)
         {
             // Validate operator id

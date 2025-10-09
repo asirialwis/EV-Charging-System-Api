@@ -1,3 +1,5 @@
+// Controllers/OperatorController.cs
+// This controller handles operations specific to Station Operators, such as validating QR codes and finalizing bookings
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using EVChargingSystem.WebAPI.Services;
