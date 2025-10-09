@@ -64,4 +64,12 @@ public class StationsController : ControllerBase
         var stations = await _stationService.GetStationsWithUpcomingBookingsAsync();
         return Ok(stations);
     }
+
+    [HttpGet("all")]
+    [Authorize(Roles = "Backoffice")]
+    public async Task<IActionResult> GetAllStationsWithDetails()
+    {
+        var stations = await _stationService.GetAllStationsWithDetailsAsync();
+        return Ok(stations);
+    }
 }
