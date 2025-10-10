@@ -5,6 +5,7 @@ using EVChargingSystem.WebAPI.Services;
 using System.Security.Claims; // To access the JWT claims
 using System.Threading.Tasks;
 using EVChargingApi.Services;
+using EVChargingApi.Data.Dto;
 
 [ApiController]
 [Route("api/evowners")] // Simplified route for both admin/owner access
@@ -13,10 +14,12 @@ using EVChargingApi.Services;
 public class EVOwnersController : ControllerBase
 {
     private readonly IUserService _userService;
+    private readonly IEVOwnerService _evOwnerService;
 
-    public EVOwnersController(IUserService userService)
+    public EVOwnersController(IUserService userService, IEVOwnerService evOwnerService)
     {
         _userService = userService;
+        _evOwnerService = evOwnerService;
     }
 
 
@@ -74,6 +77,28 @@ public class EVOwnersController : ControllerBase
     {
         var owners = await _userService.GetAllEVOwnersAsync();
         return Ok(owners);
+    }
+
+    // Get EV Owner Details by NIC (Backoffice and Station Operator only)
+    [HttpGet("details/{nic}")]
+    [Authorize(Roles = "Backoffice,StationOperator")]
+    public async Task<IActionResult> GetEVOwnerDetailsByNic(string nic)
+    {
+        try
+        {
+            var evOwnerDetails = await _evOwnerService.GetEVOwnerDetailsByNicAsync(nic);
+            
+            if (evOwnerDetails == null)
+            {
+                return NotFound(new { Message = "EV Owner not found with the provided NIC." });
+            }
+
+            return Ok(evOwnerDetails);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Message = "An error occurred while retrieving EV owner details.", Error = ex.Message });
+        }
     }
 
     // Delete EV Owner (Admin only)
