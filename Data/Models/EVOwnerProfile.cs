@@ -1,4 +1,5 @@
-﻿using MongoDB.Bson;
+﻿//Model for EVOwner profile component
+using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 using System;
 

@@ -1,3 +1,4 @@
+//business logic related to Users (Authentication, Registration, Profile Management, Admin Operations)
 using EVChargingApi.Services;
 using EVChargingSystem.WebAPI.Data.Repositories;
 using EVChargingApi.Data.Models;
@@ -7,6 +8,7 @@ using EVChargingSystem.WebAPI.Data.Dtos;
 using MongoDB.Driver;
 using MongoDB.Bson;
 using EVChargingSystem.WebAPI.Utils;
+using static BCrypt.Net.BCrypt;
 
 namespace EVChargingSystem.WebAPI.Services
 {
@@ -25,30 +27,55 @@ namespace EVChargingSystem.WebAPI.Services
             _stationRepository = stationRepository;
             _emailService = emailService;
         }
-
-        public async Task<(User? User, string? ErrorMessage)> AuthenticateAsync(string email, string password)
+        // Method to authenticate a user and return user details along with assigned station info for operators
+        public async Task<(User? User, string? ErrorMessage, string? AssignedStationId, string? AssignedStationName)> AuthenticateAsync(string email, string password)
         {
-            var user = await _userRepository.FindByEmailAndPasswordAsync(email, password);
+            // 1. RETRIEVE HASH: Find the user by email only to get the stored hash.
+            var user = await _userRepository.FindByEmailAsync(email);
 
-            // Check 1: Invalid Credentials (Credentials failed)
-            if (user == null)
+            // Check 1: Invalid Credentials (Existence OR Password Mismatch)
+            // If user is null OR the plaintext password does NOT verify against the hash, fail.
+            if (user == null || !BCrypt.Net.BCrypt.Verify(password, user.Password))
             {
-                return (null, "Invalid email or password.");
+                return (null, "Invalid email or password.", null, null);
             }
 
             // Check 2: CRITICAL SECURITY CHECK (Account Status)
             if (user.Status == "Deactivated")
             {
                 // Return null User and the specific error message
-                return (null, "Account is currently deactivated. Please contact backoffice support.");
+                return (null, "Account is currently deactivated. Please contact backoffice support.", null, null);
             }
 
-            // 3. Authentication successful
-            return (user, null);
+            // 3. OPERATOR LOGIC: Fetch the single assigned station
+            if (user.Role == "StationOperator")
+            {
+                // Fetch the single station assigned to this operator.
+                var station = await _stationRepository.FindStationByOperatorIdAsync(user.Id);
+
+                if (station == null)
+                {
+                    // Operator is logged in but unassigned. Allow login, but provide empty station data.
+                    // Returning the user ensures the token is generated.
+                    return (user, null, null, null);
+                }
+
+                // Success: Return the user, null error, the station ID, and the station Name
+                return (user, null, station.Id, station.StationName);
+            }
+
+            // 4. Authentication successful for Backoffice or EVOwner (no station data needed)
+            return (user, null, null, null);
         }
 
+        // Method to create a new user (used internally for registration and admin operations)
         public async Task CreateAsync(User user)
         {
+            string hashedPassword = BCrypt.Net.BCrypt.HashPassword(user.Password);
+
+            // 2. Overwrite the plaintext password with the hash before saving
+            user.Password = hashedPassword;
+
             // The service calls the repository's create method
             await _userRepository.CreateAsync(user);
         }
@@ -66,12 +93,15 @@ namespace EVChargingSystem.WebAPI.Services
             var existingProfile = await _profileRepository.FindByNicAsync(userDto.Nic);
             if (existingProfile != null) return false;
 
+            string hashedPassword = BCrypt.Net.BCrypt.HashPassword(userDto.Password);
+
             // 3. Create the User document
             var user = new User
             {
                 Email = userDto.Email,
-                Password = userDto.Password,
-                Role = "EVOwner"
+                Password = hashedPassword,
+                Role = "EVOwner",
+                FullName = userDto.FullName
             };
             await _userRepository.CreateAsync(user);
 
@@ -93,7 +123,7 @@ namespace EVChargingSystem.WebAPI.Services
 
             return true;
         }
-
+        // Method to update an EV Owner profile with role-based access control and dynamic PATCH logic
         public async Task<bool> UpdateEVOwnerAsync(
            string nic,
            UpdateEVOwnerDto updateDto,
@@ -196,7 +226,7 @@ namespace EVChargingSystem.WebAPI.Services
             return await _profileRepository.PartialUpdateAsync(nic, combinedUpdate);
         }
 
-
+        // Method to fetch an EV Owner profile by UserId (used by EVOwner themselves)
         public async Task<EVOwnerProfileDto?> GetOwnerProfileAsync(string userId)
         {
             // 1. Fetch the Profile using the UserId from the JWT token
@@ -231,7 +261,7 @@ namespace EVChargingSystem.WebAPI.Services
             };
         }
 
-
+        // Method to fetch all EV Owner profiles with joined email (Admin use)
         public async Task<List<EVOwnerProfileDto>> GetAllEVOwnersAsync()
         {
             // 1. Fetch all profiles (contains NIC, UserId, FullName, Status, etc.)
@@ -255,7 +285,7 @@ namespace EVChargingSystem.WebAPI.Services
                 return new EVOwnerProfileDto
                 {
                     Nic = profile.Nic,
-                    Email = user?.Email ?? "N/A", 
+                    Email = user?.Email ?? "N/A",
                     FullName = profile.FullName,
                     Phone = profile.Phone,
                     Address = profile.Address,
@@ -271,18 +301,21 @@ namespace EVChargingSystem.WebAPI.Services
 
 
 
-
+        // Method to create a new operational user (Backoffice or StationOperator) and assign station if applicable
         public async Task<(bool Success, string Message)> CreateOperatorAndAssignStationsAsync(CreateOperationalUserDto userDto)
         {
+            string hashedPassword = BCrypt.Net.BCrypt.HashPassword(userDto.Password);
+
             // 1. Create the new User (Operator/Backoffice)
             var user = new User
             {
                 Email = userDto.Email,
-                Password = userDto.Password,
+                Password = hashedPassword,
                 Role = userDto.Role,
                 FullName = userDto.FullName,
                 Phone = userDto.Phone,
                 Status = "Active",
+                AssignedStationId = userDto.AssignedStationId,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
@@ -290,13 +323,13 @@ namespace EVChargingSystem.WebAPI.Services
             // Note: The User.Id field is populated by the MongoDB driver during CreateAsync
             await _userRepository.CreateAsync(user);
 
-            // 2. Assign Station(s) (Only applies to Station Operators)
-            if (user.Role == "StationOperator" && userDto.AssignedStations.Any())
+            // 2. Assign Station (Only applies to Station Operators)
+            if (user.Role == "StationOperator" && userDto.AssignedStationId != null)
             {
-                // Add the newly created User ID to the selected Station(s)
-                var assignmentSuccess = await _stationRepository.AddOperatorToStationsAsync(
-                    userDto.AssignedStations,
-                    user.Id // The new ID generated by MongoDB
+                // Add the newly created User ID to the selected Station
+                var assignmentSuccess = await _stationRepository.AddOperatorToStationAsync(
+                    userDto.AssignedStationId,
+                    user.Id
                 );
 
                 // CRITICAL CHECK: If station assignment fails, log a warning but don't fail user creation, 
@@ -340,8 +373,7 @@ namespace EVChargingSystem.WebAPI.Services
         }
 
 
-
-
+        //create ev owners by admin
         public async Task<(bool Success, string Message)> CreateOwnerByAdminAsync(AdminCreateEVOwnerDto ownerDto)
         {
             // 1. Validation Checks (Email and NIC uniqueness)
@@ -354,12 +386,15 @@ namespace EVChargingSystem.WebAPI.Services
             // 2. Generate Secure Password
             string tempPassword = PasswordGenerator.GenerateTemporaryPassword();
 
+            string hashedPassword = BCrypt.Net.BCrypt.HashPassword(tempPassword);
+
             // 3. Create the User document (using the generated password)
             var user = new User
             {
                 Email = ownerDto.Email,
-                Password = tempPassword, // Store the generated password
+                Password = hashedPassword,
                 Role = "EVOwner",
+                FullName = ownerDto.FullName,
                 Status = "Active",
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
@@ -404,8 +439,53 @@ namespace EVChargingSystem.WebAPI.Services
                 Console.WriteLine($"Email sending failed: {ex.GetType().Name} - {ex.Message}");
                 return (true, "Account created, but email notification failed. Password must be manually given.");
             }
+        }
 
-            return (true, "Account created. Temporary password emailed to EV Owner.");
+        //get All operational users
+        public async Task<List<OperationalUserDto>> GetAllOperationalUsersAsync()
+        {
+            // 1. Get all Backoffice users
+            var backofficeUsers = await _userRepository.GetUsersByRoleAsync("Backoffice");
+
+            // 2. Get all StationOperator users
+            var operatorUsers = await _userRepository.GetUsersByRoleAsync("StationOperator");
+
+            // 3. Combine both lists
+            var allOperationalUsers = backofficeUsers.Concat(operatorUsers).ToList();
+
+            // 4. Get station information for operators
+            var stations = new Dictionary<string, string>(); // stationId -> stationName
+
+            foreach (var operatorUser in operatorUsers)
+            {
+                if (operatorUser.AssignedStationId != null)
+                {
+                    var station = await _stationRepository.FindByIdAsync(new MongoDB.Bson.ObjectId(operatorUser.AssignedStationId));
+                    if (station != null)
+                    {
+                        stations[operatorUser.AssignedStationId] = station.StationName;
+                    }
+                }
+            }
+
+            // 5. Map to DTOs
+            var result = allOperationalUsers.Select(user => new OperationalUserDto
+            {
+                Id = user.Id,
+                Email = user.Email,
+                FullName = user.FullName,
+                Phone = user.Phone,
+                Role = user.Role,
+                Status = user.Status,
+                AssignedStationId = user.AssignedStationId,
+                AssignedStationName = user.AssignedStationId != null && stations.ContainsKey(user.AssignedStationId)
+                    ? stations[user.AssignedStationId]
+                    : null,
+                CreatedAt = user.CreatedAt,
+                UpdatedAt = user.UpdatedAt
+            }).ToList();
+
+            return result;
         }
 
     }

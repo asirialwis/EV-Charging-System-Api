@@ -1,3 +1,4 @@
+//services for charging station. crud operations and other business logic
 using EVChargingSystem.WebAPI.Data.Dtos;
 using EVChargingSystem.WebAPI.Data.Models;
 using EVChargingSystem.WebAPI.Data.Repositories;
@@ -19,7 +20,7 @@ namespace EVChargingSystem.WebAPI.Services
             _bookingRepository = bookingRepository; // For booking checks during deactivation
         }
 
-
+        // Create a new charging station
         public async Task CreateStationAsync(CreateStationDto stationDto)
         {
             var acSlotCount = stationDto.ACChargingSlots ?? 0;
@@ -60,14 +61,14 @@ namespace EVChargingSystem.WebAPI.Services
             if (count <= 0) return new List<string>();
             return Enumerable.Range(1, count).Select(i => $"A{i}").ToList();
         }
-
+        // Helper methods to generate slot ID arrays
         private List<string> GenerateDCSlotArray(int count)
         {
             if (count <= 0) return new List<string>();
             return Enumerable.Range(1, count).Select(i => $"D{i}").ToList();
         }
 
-
+        // Get unassigned operators for station assignment
         public async Task<List<OperatorDto>> GetUnassignedOperatorsAsync()
         {
             // 1. Get all active Station Operators
@@ -93,7 +94,7 @@ namespace EVChargingSystem.WebAPI.Services
             return unassignedOperators;
         }
 
-
+        // Get all stations for assignment (light DTO)
         public async Task<List<StationAssignmentDto>> GetAllStationsForAssignmentAsync()
         {
             // 1. Fetch ONLY Active stations using the new repository method
@@ -114,7 +115,7 @@ namespace EVChargingSystem.WebAPI.Services
 
 
 
-
+        // Update charging station details with partial update logic
         public async Task<bool> UpdateStationAsync(string stationId, UpdateStationDto updateDto)
         {
             if (!ObjectId.TryParse(stationId, out var id)) return false;
@@ -191,6 +192,7 @@ namespace EVChargingSystem.WebAPI.Services
             return await _stationRepository.PartialUpdateAsync(stationId, combinedUpdate);
         }
 
+// Get all stations with their upcoming bookings (max 2) and operator details       
         public async Task<List<StationWithBookingsDto>> GetStationsWithUpcomingBookingsAsync()
         {
             // IST/SLST Offset
@@ -204,15 +206,15 @@ namespace EVChargingSystem.WebAPI.Services
             var allUpcomingBookings = await _stationRepository.GetUpcomingBookingsByStationIdsAsync(stationObjectIds, 0);
 
 
- // 3. Collect all unique operator IDs from ALL stations
+            // 3. Collect all unique operator IDs from ALL stations
             var allOperatorIds = allStations
                 .SelectMany(s => s.StationOperatorIds) // Flatten the List<ObjectId> from all stations
                 .Distinct()
                 .Select(oid => oid.ToString())
                 .ToList();
-            
+
             // 4. Fetch all operator user records in ONE batch query
-            var allOperatorUsers = await _userRepository.FindManyByIdsAsync(allOperatorIds); 
+            var allOperatorUsers = await _userRepository.FindManyByIdsAsync(allOperatorIds);
             var operatorLookup = allOperatorUsers.ToDictionary(u => u.Id, u => u);
 
             // 3. Group bookings by Station ID for efficient lookup
@@ -278,6 +280,68 @@ namespace EVChargingSystem.WebAPI.Services
                         })
                         .ToList();
                 }
+
+                return stationDto;
+            }).ToList();
+
+            return result;
+        }
+        // Get all stations with operator details but WITHOUT bookings (for admin management view)
+        public async Task<List<StationWithBookingsDto>> GetAllStationsWithDetailsAsync()
+        {
+            // 1. Fetch ALL stations
+            var allStations = await _stationRepository.GetAllStationsAsync();
+
+            // 2. Collect all unique operator IDs from ALL stations
+            var allOperatorIds = allStations
+                .SelectMany(s => s.StationOperatorIds) // Flatten the List<ObjectId> from all stations
+                .Distinct()
+                .Select(oid => oid.ToString())
+                .ToList();
+
+            // 3. Fetch all operator user records in ONE batch query
+            var allOperatorUsers = await _userRepository.FindManyByIdsAsync(allOperatorIds);
+            var operatorLookup = allOperatorUsers.ToDictionary(u => u.Id, u => u);
+
+            // 4. Map Stations with operator details
+            var result = allStations.Select(station =>
+            {
+                var stationDto = new StationWithBookingsDto
+                {
+                    Id = station.Id,
+                    StationName = station.StationName,
+                    StationCode = station.StationCode,
+                    ACChargingSlots = station.ACChargingSlots,
+                    DCChargingSlots = station.DCChargingSlots,
+                    ACSlots = station.ACSlots,
+                    DCSlots = station.DCSlots,
+                    ACPowerOutput = station.ACPowerOutput,
+                    ACConnector = station.ACConnector,
+                    ACChargingTime = station.ACChargingTime,
+                    AddressLine1 = station.AddressLine1,
+                    AddressLine2 = station.AddressLine2,
+                    City = station.City,
+                    Latitude = station.Latitude,
+                    Longitude = station.Longitude,
+                    TotalCapacity = station.TotalCapacity,
+                    Status = station.Status,
+                    AdditionalNotes = station.AdditionalNotes,
+                };
+
+                // --- JOIN OPERATOR DETAILS (One-to-Many) ---
+                stationDto.AssignedOperators = station.StationOperatorIds
+                    .Select(oid => oid.ToString())
+                    .Where(id => operatorLookup.ContainsKey(id)) // Ensure user details were fetched
+                    .Select(id => new SimpleOperatorDto
+                    {
+                        Id = id,
+                        FullName = operatorLookup[id].FullName,
+                        Email = operatorLookup[id].Email
+                    })
+                    .ToList();
+
+                // Initialize empty upcoming bookings list for this endpoint
+                stationDto.UpcomingBookings = new List<SimpleBookingDto>();
 
                 return stationDto;
             }).ToList();

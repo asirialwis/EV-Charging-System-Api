@@ -1,3 +1,5 @@
+// Controllers/OperatorController.cs
+// This controller handles operations specific to Station Operators, such as validating QR codes and finalizing bookings
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using EVChargingSystem.WebAPI.Services;
@@ -25,7 +27,8 @@ public class OperatorController : ControllerBase
             return BadRequest("Invalid QR code payload (Booking ID).");
         }
 
-        var booking = await _bookingService.GetBookingDetails(id); 
+        var booking = await _bookingService.GetFullBookingDetailsForOperatorAsync(id); 
+         
         
         // Validation check
         if (booking == null || booking.Status != "Approved") // Only approved bookings can be validated

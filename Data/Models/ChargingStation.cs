@@ -1,3 +1,4 @@
+//Model class for the Charging Station component
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 using System;

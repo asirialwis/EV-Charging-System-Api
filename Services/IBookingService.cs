@@ -11,16 +11,7 @@ namespace EVChargingSystem.WebAPI.Services
     public class SlotAvailabilityDto
     {
         public DateTime Date { get; set; }
-        public List<string> AvailableSlots { get; set; } // e.g., ["14:00", "14:30", "15:00"]
-    }
-
-    public class PagedResult<T>
-    {
-        public List<T> Items { get; set; } = new List<T>();
-        public long TotalCount { get; set; }
-        public int PageNumber { get; set; }
-        public int PageSize { get; set; }
-        public int TotalPages => (int)Math.Ceiling((double)TotalCount / PageSize);
+        public List<string> AvailableSlots { get; set; } = new List<string>(); // e.g., ["14:00", "14:30", "15:00"]
     }
 
     public interface IBookingService
@@ -36,9 +27,10 @@ namespace EVChargingSystem.WebAPI.Services
         Task<bool> CancelBookingAsync(string bookingId, string userId, string userRole);
         Task<bool> DeleteBookingAsync(string bookingId, string userRole);
         Task<BookingResponseDto?> GetBookingByIdAsync(string bookingId, string userId, string userRole);
-        Task<PagedResult<BookingResponseDto>> GetBookingsForEVOwnerAsync(string evOwnerId, BookingFilterDto filter);
-        Task<PagedResult<BookingResponseDto>> GetBookingsForStationAsync(string stationId, BookingFilterDto filter);
-        Task<PagedResult<BookingResponseDto>> GetAllBookingsAsync(BookingFilterDto filter);
+        Task<List<BookingResponseDto>> GetBookingsForEVOwnerAsync(string evOwnerId);
+        Task<List<BookingResponseDto>> GetBookingsForStationAsync(string stationId);
+        Task<List<BookingResponseDto>> GetAllBookingsAsync();
         Task<AvailabilityResponseDto> GetAvailableSlotIdsAsync(AvailabilityRequestDto request, string? userRole);
+        Task<OperatorBookingDetailDto?> GetFullBookingDetailsForOperatorAsync(ObjectId bookingId);
     }
 }

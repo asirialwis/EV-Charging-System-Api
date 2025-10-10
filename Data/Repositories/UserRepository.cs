@@ -1,3 +1,4 @@
+//User management logic for db
 using MongoDB.Driver;
 using EVChargingApi.Data.Models;
 using MongoDB.Bson;
@@ -14,10 +15,7 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             _users = context.GetCollection<User>("Users");
         }
 
-        public async Task<User> FindByEmailAndPasswordAsync(string email, string password)
-        {
-            return await _users.Find(u => u.Email == email && u.Password == password).FirstOrDefaultAsync();
-        }
+
 
         public async Task CreateAsync(User user)
         {
@@ -30,12 +28,14 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
         }
 
 
+        // 1. Define the filter: Find the User document by its string ID
+        // 2. Define the update: Use $set to update only the Status and the UpdatedAt timestamp
         public async Task<bool> UpdateStatusAsync(string userId, string newStatus)
         {
-            // 1. Define the filter: Find the User document by its string ID
+
             var filter = Builders<User>.Filter.Eq(u => u.Id, userId);
 
-            // 2. Define the update: Use $set to update only the Status and the UpdatedAt timestamp
+
             var update = Builders<User>.Update
                 .Set(u => u.Status, newStatus)
                 .Set(u => u.UpdatedAt, DateTime.UtcNow); // Assuming User model has UpdatedAt
@@ -72,7 +72,6 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
                 return new List<User>();
             }
 
-            // 2. CORRECTED FILTER: Use the Bson ID field "_id" for comparison
             // We are filtering where the document's _id is IN the list of objectIds.
             var filter = Builders<User>.Filter.In("_id", objectIds);
 
@@ -81,15 +80,18 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
         }
 
 
+        // The User model's Id property is mapped to the document's _id.
+        // We can search directly on the string Id because the MongoDB driver
+        // efficiently converts this to an ObjectId for the query.
         public async Task<User> FindByIdAsync(string userId)
         {
-            // The User model's Id property is mapped to the document's _id.
-            // We can search directly on the string Id because the MongoDB driver
-            // efficiently converts this to an ObjectId for the query.
+
             var filter = Builders<User>.Filter.Eq(u => u.Id, userId);
 
             return await _users.Find(filter).FirstOrDefaultAsync();
         }
+
+        //Delete User
         public async Task<bool> DeleteAsync(string userId)
         {
             var filter = Builders<User>.Filter.Eq(u => u.Id, userId);

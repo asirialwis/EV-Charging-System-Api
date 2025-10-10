@@ -1,3 +1,4 @@
+// This Authentication and Authorization code is relevant to the AdminController.cs file.user register and login handle within this controller. 
 using System.Security.Claims;
 using System.Text;
 using System.IdentityModel.Tokens.Jwt;
@@ -22,6 +23,7 @@ public class AuthController : ControllerBase
         _config = config;
     }
 
+// EV Owner self-registration
     [HttpPost("register")]
     public async Task<IActionResult> RegisterEVOwner([FromBody] RegisterUserDto userDto)
     {
@@ -39,27 +41,38 @@ public class AuthController : ControllerBase
         return Ok(new { Message = "EV Owner registered successfully." });
     }
 
+    // User login for all roles
     [HttpPost("login")]
-    public async Task<IActionResult> Login([FromBody] LoginRequestDto request)
+public async Task<IActionResult> Login([FromBody] LoginRequestDto request)
+{
+    // Deconstruct the simplified Tuple result
+    var (user, errorMessage, assignedStationId, stationName) = await _userService.AuthenticateAsync(request.Email, request.Password);
+
+    // Check if the service returned an error
+    if (user == null)
     {
-        // Deconstruct the Tuple result
-        var (user, errorMessage) = await _userService.AuthenticateAsync(request.Email, request.Password);
-
-        // Check if the service returned an error (User is null)
-        if (user == null)
-        {
-            // Return 401 Unauthorized with the specific error message
-            // If credentials failed, errorMessage is "Invalid email or password."
-            // If deactivated, errorMessage is "Account is currently deactivated..."
-            return Unauthorized(errorMessage);
-        }
-
-        // Authentication successful
-        var token = GenerateJwtToken(user);
-        return Ok(new { Token = token, Role = user.Role });
+        return Unauthorized(errorMessage);
     }
 
+    // Authentication successful
+    var token = GenerateJwtToken(user);
+    
+    // CRITICAL STEP: Construct the final response DTO
+    var response = new LoginResponseDto
+    {
+        Token = token,
+        Role = user.Role,
+        FullName = user.FullName,
+        
+        // These fields are null unless specifically populated for the Station Operator role
+        AssignedStationId = assignedStationId,
+        AssignedStationName = stationName
+    };
 
+    return Ok(response);
+}
+
+    // Admin creates Backoffice or Station Operator accounts
      [HttpPost("create-operational-user")]
     [Authorize(Roles = "Backoffice")]
     public async Task<IActionResult> CreateOperationalUser([FromBody] CreateOperationalUserDto userDto)
@@ -80,6 +93,7 @@ public class AuthController : ControllerBase
         return Ok(new { Message = message });
     }
 
+// Helper method to generate JWT token
     private string GenerateJwtToken(User user)
     {
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]));

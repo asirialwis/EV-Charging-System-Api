@@ -1,3 +1,4 @@
+//Data repository for dashboard related queries and aggregations
 using MongoDB.Driver;
 using EVChargingSystem.WebAPI.Data.Models;
 using EVChargingSystem.WebAPI.Data;
@@ -19,6 +20,7 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             _stations = context.GetCollection<ChargingStation>("ChargingStations");
         }
 
+        // Count reservations by status, with option to filter for future bookings only
         public async Task<long> CountReservationsByStatusAsync(string status, bool futureOnly)
         {
             var filter = Builders<Booking>.Filter.Eq(b => b.Status, status);
@@ -32,23 +34,26 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             return await _bookings.CountDocumentsAsync(filter);
         }
 
+        // Count stations by status
         public async Task<long> CountStationsByStatusAsync(string status)
         {
             var filter = Builders<ChargingStation>.Filter.Eq(s => s.Status, status);
             return await _stations.CountDocumentsAsync(filter);
         }
 
+            // Count all stations
         public async Task<long> CountAllStationsAsync()
         {
             return await _stations.CountDocumentsAsync(Builders<ChargingStation>.Filter.Empty);
         }
 
+        // Calculate today's capacity usage (used slots vs total slots) and return as a tuple
         public async Task<(long Used, long Total)> CalculateTodayCapacityAsync()
         {
-            // 1. Calculate Total Slots for TODAY (from all Active stations)
+            
             var activeStationFilter = Builders<ChargingStation>.Filter.Eq(s => s.Status, "Active");
 
-            // Aggregation to sum up all ACChargingSlots and DCChargingSlots from Active Stations
+          
             var totalCapacity = await _stations.Aggregate()
                 .Match(activeStationFilter)
                 .Group(
@@ -62,16 +67,15 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
 
             long totalSlots = totalCapacity?.TotalSlots ?? 0;
 
-            // 2. Calculate Used Slots for TODAY
-            // IST/SLST Offset
+            
             TimeSpan istOffset = TimeSpan.FromHours(5.5);
 
-            // Define the start and end of TODAY in UTC (based on local IST/SLST day)
+           
             var localToday = DateTime.UtcNow.Add(istOffset).Date;
             var utcDayStart = localToday.Subtract(istOffset);
             var utcDayEnd = localToday.AddDays(1).Subtract(istOffset);
 
-            // Count all Approved or Pending bookings that start TODAY
+           
             var usedSlotsFilter = Builders<Booking>.Filter.And(
                 Builders<Booking>.Filter.Gte(b => b.StartTime, utcDayStart),
                 Builders<Booking>.Filter.Lt(b => b.StartTime, utcDayEnd),
@@ -81,14 +85,13 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
                 )
             );
 
-            // NOTE: Since the assignment implies a simple count of *bookings* equals *used slots* for the purpose of the percentage:
             long usedSlots = await _bookings.CountDocumentsAsync(usedSlotsFilter);
 
-            // You could alternatively aggregate booking duration, but simple count is often expected for simple dashboard metrics.
+          
             return (usedSlots, totalSlots);
         }
         
-
+        // Get locations of all active charging stations
          public async Task<List<ChargingStationLocationDto>> GetActiveStationLocationsAsync()
         {
             var filter = Builders<ChargingStation>.Filter.Eq(s => s.Status, "Active");

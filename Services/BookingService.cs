@@ -1,3 +1,4 @@
+//booking related business logic
 using EVChargingSystem.WebAPI.Data.Dtos;
 using EVChargingSystem.WebAPI.Data.Models;
 using EVChargingSystem.WebAPI.Data.Repositories;
@@ -20,17 +21,20 @@ namespace EVChargingSystem.WebAPI.Services
         private readonly IChargingStationRepository _stationRepository;
         private readonly IEVOwnerProfileRepository _evOwnerProfileRepository;
         private readonly IUserRepository _userRepository;
+        private readonly IEVOwnerProfileRepository _profileRepository;
 
         public BookingService(
-            IBookingRepository bookingRepository, 
+            IBookingRepository bookingRepository,
             IChargingStationRepository stationRepository,
             IEVOwnerProfileRepository evOwnerProfileRepository,
-            IUserRepository userRepository)
+            IUserRepository userRepository,
+            IEVOwnerProfileRepository profileRepository)
         {
             _bookingRepository = bookingRepository;
             _stationRepository = stationRepository;
             _evOwnerProfileRepository = evOwnerProfileRepository;
             _userRepository = userRepository;
+            _profileRepository = profileRepository;
         }
 
         /**
@@ -92,9 +96,9 @@ namespace EVChargingSystem.WebAPI.Services
             {
                 IsAvailable = availableSlotIds.Any(),
                 AvailableSlotIds = availableSlotIds,
-                Message = availableSlotIds.Any() 
+                Message = availableSlotIds.Any()
                     ? $"Found {availableSlotIds.Count} available {request.SlotType} slots."
-                    : $"No available {request.SlotType} slots for the selected time period."
+                    : $"No available {request.SlotType} slots for the selected time period. Please choose a different time slot or type or station."
             };
         }
 
@@ -172,6 +176,8 @@ namespace EVChargingSystem.WebAPI.Services
             return true;
         }
 
+
+        //***approve the booking by admin
         public async Task<(bool Success, string QrCodeBase64, string Message)> ApproveBookingAsync(string bookingId)
         {
             if (!ObjectId.TryParse(bookingId, out var objectId))
@@ -290,6 +296,7 @@ namespace EVChargingSystem.WebAPI.Services
             return await _bookingRepository.UpdateBookingAsync(bookingId, combinedUpdate);
         }
 
+        //cancel booking service method
         public async Task<bool> CancelBookingAsync(string bookingId, string userId, string userRole)
         {
             if (!ObjectId.TryParse(bookingId, out var id)) return false;
@@ -307,6 +314,7 @@ namespace EVChargingSystem.WebAPI.Services
             return await _bookingRepository.UpdateStatusAsync(id, "Canceled");
         }
 
+        //delete a specific booking
         public async Task<bool> DeleteBookingAsync(string bookingId, string userRole)
         {
             if (userRole != "Backoffice" && userRole != "StationOperator") return false; // Only Backoffice and Operators can delete
@@ -325,6 +333,7 @@ namespace EVChargingSystem.WebAPI.Services
             return await _bookingRepository.DeleteBookingAsync(bookingId);
         }
 
+        //get booking by Id async
         public async Task<BookingResponseDto?> GetBookingByIdAsync(string bookingId, string userId, string userRole)
         {
             if (!ObjectId.TryParse(bookingId, out var id)) return null;
@@ -342,7 +351,7 @@ namespace EVChargingSystem.WebAPI.Services
             {
                 // Check if operator is assigned to this station
                 var user = await _userRepository.FindByIdAsync(userId);
-                if (user == null || !user.AssignedStations.Contains(booking.StationId.ToString()))
+                if (user == null || string.IsNullOrEmpty(user.AssignedStationId) || user.AssignedStationId != booking.StationId.ToString())
                 {
                     return null; // Operator can only see bookings for their assigned stations
                 }
@@ -351,10 +360,11 @@ namespace EVChargingSystem.WebAPI.Services
             return await MapToBookingResponseDto(booking);
         }
 
-        public async Task<PagedResult<BookingResponseDto>> GetBookingsForEVOwnerAsync(string evOwnerId, BookingFilterDto filter)
+        //get booking for ev owner view - Simple without filters
+        public async Task<List<BookingResponseDto>> GetBookingsForEVOwnerAsync(string evOwnerId)
         {
-            var (bookings, totalCount) = await _bookingRepository.GetBookingsByEVOwnerIdAsync(
-                new ObjectId(evOwnerId), filter);
+            var bookings = await _bookingRepository.GetBookingsByEVOwnerIdAsync(
+                new ObjectId(evOwnerId));
 
             var responseDtos = new List<BookingResponseDto>();
             foreach (var booking in bookings)
@@ -363,19 +373,14 @@ namespace EVChargingSystem.WebAPI.Services
                 if (dto != null) responseDtos.Add(dto);
             }
 
-            return new PagedResult<BookingResponseDto>
-            {
-                Items = responseDtos,
-                TotalCount = totalCount,
-                PageNumber = filter.PageNumber,
-                PageSize = filter.PageSize
-            };
+            return responseDtos;
         }
 
-        public async Task<PagedResult<BookingResponseDto>> GetBookingsForStationAsync(string stationId, BookingFilterDto filter)
+        //get bookings list for specific stations - Simple without filters
+        public async Task<List<BookingResponseDto>> GetBookingsForStationAsync(string stationId)
         {
-            var (bookings, totalCount) = await _bookingRepository.GetBookingsByStationIdAsync(
-                new ObjectId(stationId), filter);
+            var bookings = await _bookingRepository.GetBookingsByStationIdAsync(
+                new ObjectId(stationId));
 
             var responseDtos = new List<BookingResponseDto>();
             foreach (var booking in bookings)
@@ -384,18 +389,13 @@ namespace EVChargingSystem.WebAPI.Services
                 if (dto != null) responseDtos.Add(dto);
             }
 
-            return new PagedResult<BookingResponseDto>
-            {
-                Items = responseDtos,
-                TotalCount = totalCount,
-                PageNumber = filter.PageNumber,
-                PageSize = filter.PageSize
-            };
+            return responseDtos;
         }
 
-        public async Task<PagedResult<BookingResponseDto>> GetAllBookingsAsync(BookingFilterDto filter)
+        //get all bookings - Simple without filters
+        public async Task<List<BookingResponseDto>> GetAllBookingsAsync()
         {
-            var (bookings, totalCount) = await _bookingRepository.GetAllBookingsAsync(filter);
+            var bookings = await _bookingRepository.GetAllBookingsAsync();
 
             var responseDtos = new List<BookingResponseDto>();
             foreach (var booking in bookings)
@@ -404,24 +404,18 @@ namespace EVChargingSystem.WebAPI.Services
                 if (dto != null) responseDtos.Add(dto);
             }
 
-            return new PagedResult<BookingResponseDto>
-            {
-                Items = responseDtos,
-                TotalCount = totalCount,
-                PageNumber = filter.PageNumber,
-                PageSize = filter.PageSize
-            };
+            return responseDtos;
         }
 
-        
 
+        //dto for map bookings data
         private async Task<BookingResponseDto?> MapToBookingResponseDto(Booking booking)
         {
             try
             {
                 // Get EV Owner profile
                 var evOwnerProfile = await _evOwnerProfileRepository.FindByUserIdAsync(booking.EVOwnerId.ToString());
-                
+
                 // Get station details
                 var station = await _stationRepository.FindByIdAsync(booking.StationId);
 
@@ -454,6 +448,57 @@ namespace EVChargingSystem.WebAPI.Services
             {
                 return null;
             }
+        }
+
+
+
+
+        //get booking data for operator assign
+        public async Task<OperatorBookingDetailDto?> GetFullBookingDetailsForOperatorAsync(ObjectId bookingId)
+        {
+            // IST/SLST Offset
+            TimeSpan istOffset = TimeSpan.FromHours(5.5);
+
+            // 1. Fetch the core Booking document
+            var booking = await _bookingRepository.FindByIdAsync(bookingId);
+            if (booking == null) return null;
+
+            // 2. Fetch the EV Owner Profile (using the EVOwnerId from the booking)
+            var profile = await _profileRepository.FindByUserIdAsync(booking.EVOwnerId.ToString());
+
+            // 3. Fetch the Charging Station details (using the StationId from the booking)
+            // You need a FindByIdAsync method in IChargingStationRepository for this.
+            var station = await _stationRepository.FindByIdAsync(booking.StationId);
+
+            // If critical data (Profile or Station) is missing, fail gracefully
+            if (profile == null || station == null)
+            {
+                // Consider logging this as a data integrity error
+                return null;
+            }
+
+            // 4. Map and return the combined DTO
+            return new OperatorBookingDetailDto
+            {
+                BookingId = booking.Id,
+                SlotType = booking.SlotType,
+                SlotId = booking.SlotId,
+                Status = booking.Status,
+
+                // Convert UTC time to local IST/SLST time for the operator
+                StartTimeLocal = booking.StartTime.Add(istOffset),
+                EndTimeLocal = booking.EndTime.Add(istOffset),
+
+                // Mapped Owner Details
+                EVOwnerFullName = profile.FullName,
+                NIC = profile.Nic,
+                VehicleModel = profile.VehicleModel,
+                LicensePlate = profile.LicensePlate,
+
+                // Mapped Station Details
+                // StationId = station.Id,
+                StationName = station.StationName
+            };
         }
     }
 }

@@ -1,4 +1,5 @@
-﻿using MongoDB.Bson;
+﻿//Mongodb Configuration , used Mongodb charp driver
+using MongoDB.Bson;
 using MongoDB.Driver;
 
 namespace EVChargingSystem.WebAPI.Data

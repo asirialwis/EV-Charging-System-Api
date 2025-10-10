@@ -1,4 +1,5 @@
-﻿using MongoDB.Driver;
+﻿//EVowner profile management
+using MongoDB.Driver;
 using EVChargingApi.Data.Models;
 using EVChargingSystem.WebAPI.Data;
 using MongoDB.Bson;
@@ -14,11 +15,13 @@ namespace EVChargingApi.Data.Repositories
             _profiles = context.GetCollection<EVOwnerProfile>("EVOwnerProfiles");
         }
 
+        //Find EVOwner by NIC
         public async Task<EVOwnerProfile> FindByNicAsync(string nic)
         {
             return await _profiles.Find(p => p.Nic == nic).FirstOrDefaultAsync();
         }
 
+        //create ev owner
         public async Task CreateAsync(EVOwnerProfile profile)
         {
             await _profiles.InsertOneAsync(profile);
@@ -33,27 +36,29 @@ namespace EVChargingApi.Data.Repositories
             return result.ModifiedCount == 1;
         }
 
+        //search evowner profile
         public async Task<EVOwnerProfile> FindByUserIdAsync(string userId)
         {
-            // CRITICAL STEP: Convert the string userId to an ObjectId
+
             if (!ObjectId.TryParse(userId, out var objectId))
             {
-                // Return null if the provided ID is not a valid ObjectId format
+
                 return null;
             }
 
-            // Filter: Find the profile where the UserId field matches the ObjectId
+
             var filter = Builders<EVOwnerProfile>.Filter.Eq(p => p.UserId, objectId);
 
             return await _profiles.Find(filter).FirstOrDefaultAsync();
         }
 
+        //getallprofiles
         public async Task<List<EVOwnerProfile>> GetAllProfilesAsync()
         {
             return await _profiles.Find(_ => true).ToListAsync();
         }
 
-
+        //delete evowner profile
         public async Task<bool> DeleteAsync(string nic)
         {
             // Define the filter to find the document by NIC

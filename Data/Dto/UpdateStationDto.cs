@@ -19,7 +19,7 @@ namespace EVChargingSystem.WebAPI.Data.Dtos
         public int? TotalCapacity { get; set; }
 
         // Assignment Details (For Many-to-Many updates)
-          public List<string> StationOperatorIds { get; set; } = new List<string>();
+        public List<string> StationOperatorIds { get; set; } = new List<string>();
 
         // Location
         public string? AddressLine1 { get; set; }

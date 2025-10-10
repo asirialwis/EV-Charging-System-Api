@@ -1,3 +1,4 @@
+//DB logic for the Booking management
 using MongoDB.Driver;
 using EVChargingSystem.WebAPI.Data.Models;
 using EVChargingSystem.WebAPI.Data;
@@ -24,6 +25,7 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             _evOwnerProfiles = context.GetCollection<EVOwnerProfile>("EVOwnerProfiles");
         }
 
+        // Check for conflicting bookings based on overlap logic
         public async Task<long> CountConflictingBookingsAsync(
             ObjectId stationId,
             string slotType,
@@ -47,6 +49,7 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             return await _bookings.CountDocumentsAsync(filter);
         }
 
+        // Fetch all bookings for a specific station, slot type, and day
         public async Task<List<Booking>> GetApprovedBookingsForDayAsync(
             ObjectId stationId,
             string slotType,
@@ -79,13 +82,14 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             await _bookings.InsertOneAsync(booking);
         }
 
-
+        // Find booking by its string ID
         public async Task<Booking> FindByIdAsync(ObjectId bookingId)
         {
             // Note: MongoDB driver often handles string conversion, but this uses ObjectId for the filter
             return await _bookings.Find(b => b.Id == bookingId.ToString()).FirstOrDefaultAsync();
         }
 
+        // Update only the Status and UpdatedAt fields of a booking
         public async Task<bool> UpdateStatusAsync(ObjectId bookingId, string newStatus)
         {
             var filter = Builders<Booking>.Filter.Eq(b => b.Id, bookingId.ToString());
@@ -101,6 +105,7 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             return result.IsAcknowledged && result.ModifiedCount == 1;
         }
 
+        // Update both Status and QrCodeBase64 fields of a booking
         public async Task<bool> UpdateBookingAndQrCodeAsync(ObjectId bookingId, string newStatus, string qrCodeBase64)
         {
             var filter = Builders<Booking>.Filter.Eq(b => b.Id, bookingId.ToString());
@@ -116,6 +121,7 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             return result.IsAcknowledged && result.ModifiedCount == 1;
         }
         
+        // Check if there are any active (non-canceled, non-completed) bookings for a station
          public async Task<bool> HasActiveBookingsForStationAsync(ObjectId stationId)
         {
             var filter = Builders<Booking>.Filter.And(
@@ -133,111 +139,44 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             return count > 0;
         }
 
-        public async Task<(List<Booking> Bookings, long TotalCount)> GetBookingsByEVOwnerIdAsync(ObjectId evOwnerId, BookingFilterDto filter)
+        // Get bookings for EVOwner - Simple without any filters
+        public async Task<List<Booking>> GetBookingsByEVOwnerIdAsync(ObjectId evOwnerId)
         {
             var baseFilter = Builders<Booking>.Filter.Eq(b => b.EVOwnerId, evOwnerId);
-            
-            // Apply status filter if provided
-            if (!string.IsNullOrEmpty(filter.Status))
-            {
-                baseFilter = Builders<Booking>.Filter.And(baseFilter, Builders<Booking>.Filter.Eq(b => b.Status, filter.Status));
-            }
 
-            var totalCount = await _bookings.CountDocumentsAsync(baseFilter);
-            
             var bookings = await _bookings
                 .Find(baseFilter)
                 .SortByDescending(b => b.CreatedAt)
-                .Skip((filter.PageNumber - 1) * filter.PageSize)
-                .Limit(filter.PageSize)
                 .ToListAsync();
 
-            return (bookings, totalCount);
+            return bookings;
         }
 
-        public async Task<(List<Booking> Bookings, long TotalCount)> GetBookingsByStationIdAsync(ObjectId stationId, BookingFilterDto filter)
+        // Get bookings for Station - Simple without any filters
+        public async Task<List<Booking>> GetBookingsByStationIdAsync(ObjectId stationId)
         {
             var baseFilter = Builders<Booking>.Filter.Eq(b => b.StationId, stationId);
-            
-            // Apply status filter if provided
-            if (!string.IsNullOrEmpty(filter.Status))
-            {
-                baseFilter = Builders<Booking>.Filter.And(baseFilter, Builders<Booking>.Filter.Eq(b => b.Status, filter.Status));
-            }
 
-            var totalCount = await _bookings.CountDocumentsAsync(baseFilter);
-            
             var bookings = await _bookings
                 .Find(baseFilter)
                 .SortByDescending(b => b.CreatedAt)
-                .Skip((filter.PageNumber - 1) * filter.PageSize)
-                .Limit(filter.PageSize)
                 .ToListAsync();
 
-            return (bookings, totalCount);
+            return bookings;
         }
 
-        public async Task<(List<Booking> Bookings, long TotalCount)> GetAllBookingsAsync(BookingFilterDto filter)
+        // Get all bookings for Admin - Simple without any filters
+        public async Task<List<Booking>> GetAllBookingsAsync()
         {
-            var pipeline = new List<BsonDocument>();
-            
-            // Match stage for basic filters
-            var matchStage = new BsonDocument("$match", new BsonDocument());
-            
-            // Apply status filter if provided
-            if (!string.IsNullOrEmpty(filter.Status))
-            {
-                matchStage["$match"]["Status"] = filter.Status;
-            }
+            var bookings = await _bookings
+                .Find(Builders<Booking>.Filter.Empty)
+                .SortByDescending(b => b.CreatedAt)
+                .ToListAsync();
 
-            pipeline.Add(matchStage);
-
-            // Lookup EVOwnerProfile for search functionality
-            pipeline.Add(new BsonDocument("$lookup", new BsonDocument
-            {
-                { "from", "EVOwnerProfiles" },
-                { "localField", "EVOwnerId" },
-                { "foreignField", "UserId" },
-                { "as", "evOwnerProfile" }
-            }));
-
-            // Lookup ChargingStation for search functionality
-            pipeline.Add(new BsonDocument("$lookup", new BsonDocument
-            {
-                { "from", "ChargingStations" },
-                { "localField", "StationId" },
-                { "foreignField", "_id" },
-                { "as", "station" }
-            }));
-
-            // Apply search filter if provided
-            if (!string.IsNullOrEmpty(filter.SearchTerm))
-            {
-                var searchFilter = new BsonDocument("$or", new BsonArray
-                {
-                    new BsonDocument("evOwnerProfile.FullName", new BsonDocument("$regex", new BsonRegularExpression(filter.SearchTerm, "i"))),
-                    new BsonDocument("evOwnerProfile.Nic", new BsonDocument("$regex", new BsonRegularExpression(filter.SearchTerm, "i"))),
-                    new BsonDocument("station.StationName", new BsonDocument("$regex", new BsonRegularExpression(filter.SearchTerm, "i")))
-                });
-                pipeline.Add(new BsonDocument("$match", searchFilter));
-            }
-
-            // Count total documents
-            var countPipeline = new List<BsonDocument>(pipeline);
-            countPipeline.Add(new BsonDocument("$count", "total"));
-            var countResult = await _bookings.Aggregate<BsonDocument>(countPipeline).FirstOrDefaultAsync();
-            var totalCount = countResult?["total"]?.AsInt64 ?? 0;
-
-            // Add sorting and pagination
-            pipeline.Add(new BsonDocument("$sort", new BsonDocument("CreatedAt", -1)));
-            pipeline.Add(new BsonDocument("$skip", (filter.PageNumber - 1) * filter.PageSize));
-            pipeline.Add(new BsonDocument("$limit", filter.PageSize));
-
-            var bookings = await _bookings.Aggregate<Booking>(pipeline).ToListAsync();
-
-            return (bookings, totalCount);
+            return bookings;
         }
 
+        // Generic update method for bookings
         public async Task<bool> UpdateBookingAsync(string bookingId, UpdateDefinition<Booking> update)
         {
             var filter = Builders<Booking>.Filter.Eq(b => b.Id, bookingId);
@@ -245,6 +184,7 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             return result.IsAcknowledged && result.ModifiedCount == 1;
         }
 
+        // Delete a booking by its ID
         public async Task<bool> DeleteBookingAsync(string bookingId)
         {
             var filter = Builders<Booking>.Filter.Eq(b => b.Id, bookingId);
@@ -252,6 +192,8 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             return result.IsAcknowledged && result.DeletedCount == 1;
         }
 
+        // Check if a specific slot is available for booking within a time range
+        // Exclude a specific booking ID when checking (useful for updates)
         public async Task<bool> CheckSlotAvailabilityAsync(ObjectId stationId, string slotId, DateTime start, DateTime end, string? excludeBookingId)
         {
             var filter = Builders<Booking>.Filter.And(
@@ -273,6 +215,8 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             return count == 0;
         }
 
+        // Get all booked slot IDs for a station and slot type within a time range
+        // Useful for determining available slots
         public async Task<List<string>> GetBookedSlotIdsAsync(ObjectId stationId, string slotType, DateTime start, DateTime end)
         {
             var filter = Builders<Booking>.Filter.And(
