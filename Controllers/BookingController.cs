@@ -70,7 +70,7 @@ public class BookingController : ControllerBase
 
             if (!success)
             {
-                return BadRequest("Failed to create booking. Please check station availability and booking constraints.");
+                return Ok(new { Message = "Booking failed due to unavailability. Please select a different time slot or different station." });
             }
 
             var message = userRole == "EVOwner" 
