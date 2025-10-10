@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
 public class BookingController : ControllerBase
 {
     private readonly IBookingService _bookingService;
@@ -27,7 +26,7 @@ public class BookingController : ControllerBase
     // Extract user role from JWT claims
     private string GetUserRole()
     {
-        return User.FindFirst("role")?.Value ?? throw new UnauthorizedAccessException("User role not found in token.");
+        return User.FindFirst(ClaimTypes.Role)?.Value ?? throw new UnauthorizedAccessException("User role not found in token.");
     }
 
     // Check availability of charging slots
@@ -37,6 +36,7 @@ public class BookingController : ControllerBase
     {
         try
         {
+            var userId = GetUserId();
             var userRole = GetUserRole();
             var result = await _bookingService.GetAvailableSlotIdsAsync(request, userRole);
 
@@ -56,7 +56,6 @@ public class BookingController : ControllerBase
         {
             var userId = GetUserId();
             var userRole = GetUserRole();
-
             
             if (userRole == "EVOwner")
             {
@@ -118,6 +117,7 @@ public class BookingController : ControllerBase
         try
         {
             var evOwnerId = GetUserId();
+
             var result = await _bookingService.GetBookingsForEVOwnerAsync(evOwnerId, filter);
 
             return Ok(result);
@@ -244,7 +244,9 @@ public class BookingController : ControllerBase
         try
         {
             var userRole = GetUserRole();
+
             var success = await _bookingService.DeleteBookingAsync(id, userRole);
+
 
             if (!success)
             {
