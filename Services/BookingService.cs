@@ -98,7 +98,7 @@ namespace EVChargingSystem.WebAPI.Services
                 AvailableSlotIds = availableSlotIds,
                 Message = availableSlotIds.Any()
                     ? $"Found {availableSlotIds.Count} available {request.SlotType} slots."
-                    : $"No available {request.SlotType} slots for the selected time period."
+                    : $"No available {request.SlotType} slots for the selected time period. Please choose a different time slot or type or station."
             };
         }
 
@@ -360,11 +360,11 @@ namespace EVChargingSystem.WebAPI.Services
             return await MapToBookingResponseDto(booking);
         }
 
-        //get booking for ev owner view
-        public async Task<PagedResult<BookingResponseDto>> GetBookingsForEVOwnerAsync(string evOwnerId, BookingFilterDto filter)
+        //get booking for ev owner view - Simple without filters
+        public async Task<List<BookingResponseDto>> GetBookingsForEVOwnerAsync(string evOwnerId)
         {
-            var (bookings, totalCount) = await _bookingRepository.GetBookingsByEVOwnerIdAsync(
-                new ObjectId(evOwnerId), filter);
+            var bookings = await _bookingRepository.GetBookingsByEVOwnerIdAsync(
+                new ObjectId(evOwnerId));
 
             var responseDtos = new List<BookingResponseDto>();
             foreach (var booking in bookings)
@@ -373,20 +373,14 @@ namespace EVChargingSystem.WebAPI.Services
                 if (dto != null) responseDtos.Add(dto);
             }
 
-            return new PagedResult<BookingResponseDto>
-            {
-                Items = responseDtos,
-                TotalCount = totalCount,
-                PageNumber = filter.PageNumber,
-                PageSize = filter.PageSize
-            };
+            return responseDtos;
         }
 
-        //get bookings list for specific stations
-        public async Task<PagedResult<BookingResponseDto>> GetBookingsForStationAsync(string stationId, BookingFilterDto filter)
+        //get bookings list for specific stations - Simple without filters
+        public async Task<List<BookingResponseDto>> GetBookingsForStationAsync(string stationId)
         {
-            var (bookings, totalCount) = await _bookingRepository.GetBookingsByStationIdAsync(
-                new ObjectId(stationId), filter);
+            var bookings = await _bookingRepository.GetBookingsByStationIdAsync(
+                new ObjectId(stationId));
 
             var responseDtos = new List<BookingResponseDto>();
             foreach (var booking in bookings)
@@ -395,19 +389,13 @@ namespace EVChargingSystem.WebAPI.Services
                 if (dto != null) responseDtos.Add(dto);
             }
 
-            return new PagedResult<BookingResponseDto>
-            {
-                Items = responseDtos,
-                TotalCount = totalCount,
-                PageNumber = filter.PageNumber,
-                PageSize = filter.PageSize
-            };
+            return responseDtos;
         }
 
-        //get all bookings
-        public async Task<PagedResult<BookingResponseDto>> GetAllBookingsAsync(BookingFilterDto filter)
+        //get all bookings - Simple without filters
+        public async Task<List<BookingResponseDto>> GetAllBookingsAsync()
         {
-            var (bookings, totalCount) = await _bookingRepository.GetAllBookingsAsync(filter);
+            var bookings = await _bookingRepository.GetAllBookingsAsync();
 
             var responseDtos = new List<BookingResponseDto>();
             foreach (var booking in bookings)
@@ -416,13 +404,7 @@ namespace EVChargingSystem.WebAPI.Services
                 if (dto != null) responseDtos.Add(dto);
             }
 
-            return new PagedResult<BookingResponseDto>
-            {
-                Items = responseDtos,
-                TotalCount = totalCount,
-                PageNumber = filter.PageNumber,
-                PageSize = filter.PageSize
-            };
+            return responseDtos;
         }
 
 

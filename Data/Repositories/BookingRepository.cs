@@ -139,112 +139,41 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             return count > 0;
         }
 
-        // Advanced filtering with pagination for EVOwner and Station
-        public async Task<(List<Booking> Bookings, long TotalCount)> GetBookingsByEVOwnerIdAsync(ObjectId evOwnerId, BookingFilterDto filter)
+        // Get bookings for EVOwner - Simple without any filters
+        public async Task<List<Booking>> GetBookingsByEVOwnerIdAsync(ObjectId evOwnerId)
         {
             var baseFilter = Builders<Booking>.Filter.Eq(b => b.EVOwnerId, evOwnerId);
 
-            // Apply status filter if provided
-            if (!string.IsNullOrEmpty(filter.Status))
-            {
-                baseFilter = Builders<Booking>.Filter.And(baseFilter, Builders<Booking>.Filter.Eq(b => b.Status, filter.Status));
-            }
-
-            var totalCount = await _bookings.CountDocumentsAsync(baseFilter);
-
             var bookings = await _bookings
                 .Find(baseFilter)
                 .SortByDescending(b => b.CreatedAt)
-                .Skip((filter.PageNumber - 1) * filter.PageSize)
-                .Limit(filter.PageSize)
                 .ToListAsync();
 
-            return (bookings, totalCount);
+            return bookings;
         }
 
-        // Advanced filtering with pagination for Station
-        public async Task<(List<Booking> Bookings, long TotalCount)> GetBookingsByStationIdAsync(ObjectId stationId, BookingFilterDto filter)
+        // Get bookings for Station - Simple without any filters
+        public async Task<List<Booking>> GetBookingsByStationIdAsync(ObjectId stationId)
         {
             var baseFilter = Builders<Booking>.Filter.Eq(b => b.StationId, stationId);
 
-            // Apply status filter if provided
-            if (!string.IsNullOrEmpty(filter.Status))
-            {
-                baseFilter = Builders<Booking>.Filter.And(baseFilter, Builders<Booking>.Filter.Eq(b => b.Status, filter.Status));
-            }
-
-            var totalCount = await _bookings.CountDocumentsAsync(baseFilter);
-
             var bookings = await _bookings
                 .Find(baseFilter)
                 .SortByDescending(b => b.CreatedAt)
-                .Skip((filter.PageNumber - 1) * filter.PageSize)
-                .Limit(filter.PageSize)
                 .ToListAsync();
 
-            return (bookings, totalCount);
+            return bookings;
         }
 
-        // Advanced filtering with pagination for Admin (all bookings)
-        public async Task<(List<Booking> Bookings, long TotalCount)> GetAllBookingsAsync(BookingFilterDto filter)
+        // Get all bookings for Admin - Simple without any filters
+        public async Task<List<Booking>> GetAllBookingsAsync()
         {
-            var pipeline = new List<BsonDocument>();
+            var bookings = await _bookings
+                .Find(Builders<Booking>.Filter.Empty)
+                .SortByDescending(b => b.CreatedAt)
+                .ToListAsync();
 
-            // Match stage for basic filters
-            var matchStage = new BsonDocument("$match", new BsonDocument());
-
-            // Apply status filter if provided
-            if (!string.IsNullOrEmpty(filter.Status))
-            {
-                matchStage["$match"]["Status"] = filter.Status;
-            }
-
-            pipeline.Add(matchStage);
-
-            // Lookup EVOwnerProfile for search functionality
-            pipeline.Add(new BsonDocument("$lookup", new BsonDocument
-            {
-                { "from", "EVOwnerProfiles" },
-                { "localField", "EVOwnerId" },
-                { "foreignField", "UserId" },
-                { "as", "evOwnerProfile" }
-            }));
-
-            // Lookup ChargingStation for search functionality
-            pipeline.Add(new BsonDocument("$lookup", new BsonDocument
-            {
-                { "from", "ChargingStations" },
-                { "localField", "StationId" },
-                { "foreignField", "_id" },
-                { "as", "station" }
-            }));
-
-            // Apply search filter if provided
-            if (!string.IsNullOrEmpty(filter.SearchTerm))
-            {
-                var searchFilter = new BsonDocument("$or", new BsonArray
-                {
-                    new BsonDocument("evOwnerProfile.FullName", new BsonDocument("$regex", new BsonRegularExpression(filter.SearchTerm, "i"))),
-                    new BsonDocument("evOwnerProfile.Nic", new BsonDocument("$regex", new BsonRegularExpression(filter.SearchTerm, "i"))),
-                    new BsonDocument("station.StationName", new BsonDocument("$regex", new BsonRegularExpression(filter.SearchTerm, "i")))
-                });
-                pipeline.Add(new BsonDocument("$match", searchFilter));
-            }
-
-            // Count total documents
-            var countPipeline = new List<BsonDocument>(pipeline);
-            countPipeline.Add(new BsonDocument("$count", "total"));
-            var countResult = await _bookings.Aggregate<BsonDocument>(countPipeline).FirstOrDefaultAsync();
-            var totalCount = countResult?["total"]?.AsInt64 ?? 0;
-
-            // Add sorting and pagination
-            pipeline.Add(new BsonDocument("$sort", new BsonDocument("CreatedAt", -1)));
-            pipeline.Add(new BsonDocument("$skip", (filter.PageNumber - 1) * filter.PageSize));
-            pipeline.Add(new BsonDocument("$limit", filter.PageSize));
-
-            var bookings = await _bookings.Aggregate<Booking>(pipeline).ToListAsync();
-
-            return (bookings, totalCount);
+            return bookings;
         }
 
         // Generic update method for bookings

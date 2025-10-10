@@ -112,13 +112,13 @@ public class BookingController : ControllerBase
     // Get bookings for the authenticated EV Owner
     [HttpGet("my-bookings")]
     [Authorize(Roles = "EVOwner")]
-    public async Task<IActionResult> GetMyBookings([FromQuery] BookingFilterDto filter)
+    public async Task<IActionResult> GetMyBookings()
     {
         try
         {
             var evOwnerId = GetUserId();
 
-            var result = await _bookingService.GetBookingsForEVOwnerAsync(evOwnerId, filter);
+            var result = await _bookingService.GetBookingsForEVOwnerAsync(evOwnerId);
 
             return Ok(result);
         }
@@ -131,11 +131,11 @@ public class BookingController : ControllerBase
     // Get bookings for a specific station (Station Operator only)
     [HttpGet("station/{stationId}")]
     [Authorize(Roles = "StationOperator")]
-    public async Task<IActionResult> GetBookingsByStation(string stationId, [FromQuery] BookingFilterDto filter)
+    public async Task<IActionResult> GetBookingsByStation(string stationId)
     {
         try
         {
-            var result = await _bookingService.GetBookingsForStationAsync(stationId, filter);
+            var result = await _bookingService.GetBookingsForStationAsync(stationId);
             return Ok(result);
         }
         catch (UnauthorizedAccessException ex)
@@ -144,14 +144,14 @@ public class BookingController : ControllerBase
         }
     }
 
-    // Get all bookings (Backoffice only) with optional filtering
+    // Get all bookings (Backoffice only)
     [HttpGet("all")]
     [Authorize(Roles = "Backoffice")]
-    public async Task<IActionResult> GetAllBookings([FromQuery] BookingFilterDto filter)
+    public async Task<IActionResult> GetAllBookings()
     {
         try
         {
-            var result = await _bookingService.GetAllBookingsAsync(filter);
+            var result = await _bookingService.GetAllBookingsAsync();
             return Ok(result);
         }
         catch (UnauthorizedAccessException ex)

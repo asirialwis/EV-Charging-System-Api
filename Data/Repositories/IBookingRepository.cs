@@ -28,10 +28,10 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
         Task<bool> UpdateBookingAndQrCodeAsync(ObjectId bookingId, string newStatus, string qrCodeBase64);
         Task<bool> HasActiveBookingsForStationAsync(ObjectId stationId);
 
-        // New methods for enhanced functionality
-        Task<(List<Booking> Bookings, long TotalCount)> GetBookingsByEVOwnerIdAsync(ObjectId evOwnerId, BookingFilterDto filter);
-        Task<(List<Booking> Bookings, long TotalCount)> GetBookingsByStationIdAsync(ObjectId stationId, BookingFilterDto filter);
-        Task<(List<Booking> Bookings, long TotalCount)> GetAllBookingsAsync(BookingFilterDto filter);
+        // New methods for enhanced functionality - Simple without filters
+        Task<List<Booking>> GetBookingsByEVOwnerIdAsync(ObjectId evOwnerId);
+        Task<List<Booking>> GetBookingsByStationIdAsync(ObjectId stationId);
+        Task<List<Booking>> GetAllBookingsAsync();
         Task<bool> UpdateBookingAsync(string bookingId, UpdateDefinition<Booking> update);
         Task<bool> DeleteBookingAsync(string bookingId);
         Task<bool> CheckSlotAvailabilityAsync(ObjectId stationId, string slotId, DateTime start, DateTime end, string? excludeBookingId);
