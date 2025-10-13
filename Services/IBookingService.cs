@@ -32,5 +32,8 @@ namespace EVChargingSystem.WebAPI.Services
         Task<List<BookingResponseDto>> GetAllBookingsAsync();
         Task<AvailabilityResponseDto> GetAvailableSlotIdsAsync(AvailabilityRequestDto request, string? userRole);
         Task<OperatorBookingDetailDto?> GetFullBookingDetailsForOperatorAsync(ObjectId bookingId);
+
+
+        Task<List<BookingDataDto>> GetAllBookingsWithDetailsAsync();
     }
 }

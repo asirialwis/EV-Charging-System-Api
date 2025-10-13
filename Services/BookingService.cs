@@ -500,5 +500,65 @@ namespace EVChargingSystem.WebAPI.Services
                 StationName = station.StationName
             };
         }
+
+
+
+      public async Task<List<BookingDataDto>> GetAllBookingsWithDetailsAsync()
+        {
+            // 1. Fetch ALL bookings
+            var allBookings = await _bookingRepository.GetAllBookingsAsync();
+
+            // --- STEP 2: BULK DATA RETRIEVAL ---
+            
+            // Collect ALL necessary IDs in two separate lists
+            var evOwnerUserIds = allBookings.Select(b => b.EVOwnerId).Distinct().ToList();
+            var stationIds = allBookings.Select(b => b.StationId).Distinct().ToList();
+
+            // Fetch profiles and stations in parallel (efficiency!)
+            var profilesTask = _profileRepository.FindManyByUserIdsAsync(evOwnerUserIds);
+            var stationsTask = _stationRepository.FindManyByIdsAsync(stationIds); // NEW BATCH FETCH
+            
+            await Task.WhenAll(profilesTask, stationsTask);
+
+            // 3. Create fast lookup dictionaries
+            var profileLookup = profilesTask.Result.ToDictionary(p => p.UserId, p => p);
+            var stationLookup = stationsTask.Result.ToDictionary(s => new ObjectId(s.Id), s => s); // NEW LOOKUP
+
+            // 4. Perform the in-memory 3-way join and mapping
+            var result = allBookings.Select(booking =>
+            {
+                profileLookup.TryGetValue(booking.EVOwnerId, out var profile);
+                stationLookup.TryGetValue(booking.StationId, out var station);
+
+                // Initialize the DTO and map all booking fields
+                var dto = new BookingDataDto
+                {
+                    Id = booking.Id,
+                    EVOwnerId = booking.EVOwnerId,
+                    StationId = booking.StationId,
+                    SlotType = booking.SlotType,
+                    StartTime = booking.StartTime,
+                    EndTime = booking.EndTime,
+                    Status = booking.Status,
+                    QrCodeBase64 = booking.QrCodeBase64,
+                    CreatedAt = booking.CreatedAt,
+                    UpdatedAt = booking.UpdatedAt,
+                    BookingDate = booking.BookingDate,
+                    SlotId = booking.SlotId, // Ensure this required field is mapped
+
+                    // Joined EV Owner Data
+                    EVOwnerFullName = profile?.FullName ?? "N/A",
+                    EVOwnerNIC = profile?.Nic ?? "N/A",
+                    
+                    // Joined Station Data (NEW)
+                    StationName = station?.StationName ?? "N/A",
+                    StationCode = station?.StationCode ?? "N/A"
+                };
+                
+                return dto;
+            }).ToList();
+
+            return result;
+        }
     }
 }

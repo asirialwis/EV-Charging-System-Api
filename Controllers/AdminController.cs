@@ -79,4 +79,14 @@ public class AdminController : ControllerBase
         return Ok(users);
     }
 
+
+
+
+    [HttpGet("all-bookings")]
+    public async Task<IActionResult> GetAllBookings()
+    {
+        var bookings = await _bookingService.GetAllBookingsWithDetailsAsync();
+        return Ok(bookings);
+    }
+
 }

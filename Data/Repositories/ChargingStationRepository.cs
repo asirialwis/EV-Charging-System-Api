@@ -162,5 +162,13 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
 
             return result.ModifiedCount == 1;
         }
+
+        public async Task<List<ChargingStation>> FindManyByIdsAsync(List<ObjectId> stationIds)
+        {
+            // Filter: Find all stations whose _id is IN the list of ObjectIds
+            var filter = Builders<ChargingStation>.Filter.In(s => s.Id, stationIds.Select(oid => oid.ToString()));
+
+            return await _stations.Find(filter).ToListAsync();
+        }
     }
 }

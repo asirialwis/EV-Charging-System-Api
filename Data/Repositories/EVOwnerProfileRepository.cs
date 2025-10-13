@@ -63,12 +63,22 @@ namespace EVChargingApi.Data.Repositories
         {
             // Define the filter to find the document by NIC
             var filter = Builders<EVOwnerProfile>.Filter.Eq(p => p.Nic, nic);
-            
+
             // Execute the deletion
             var result = await _profiles.DeleteOneAsync(filter);
-            
+
             // Return true if exactly one document was deleted
             return result.DeletedCount == 1;
         }
+        
+
+
+         public async Task<List<EVOwnerProfile>> FindManyByUserIdsAsync(List<ObjectId> userIds)
+    {
+        // Filter: Find all profiles whose UserId is IN the provided list of ObjectIds
+        var filter = Builders<EVOwnerProfile>.Filter.In(p => p.UserId, userIds);
+        
+        return await _profiles.Find(filter).ToListAsync();
+    }
     }
 }
