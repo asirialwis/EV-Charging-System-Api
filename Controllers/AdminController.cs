@@ -8,7 +8,7 @@ using EVChargingApi.Services;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Backoffice")] // Only Backoffice can manage approvals
+ // Only Backoffice and Operator can manage approvals
 public class AdminController : ControllerBase
 {
     private readonly IBookingService _bookingService;
@@ -24,6 +24,7 @@ public class AdminController : ControllerBase
 
     // approve booking for EV owner
     [HttpPost("approve-booking/{bookingId}")]
+    [Authorize(Roles = "Backoffice,StationOperator")]
     public async Task<IActionResult> ApproveBooking(string bookingId)
     {
         (bool success, string qrCode, string message) = await _bookingService.ApproveBookingAsync(bookingId);
@@ -40,6 +41,7 @@ public class AdminController : ControllerBase
 
     //Fetch dashboard metrics
     [HttpGet("dashboard-metrics")]
+    [Authorize(Roles = "Backoffice,StationOperator")]
     public async Task<IActionResult> GetDashboardMetrics()
     {
         var metrics = await _dashboardService.GetMetricsAsync();
@@ -48,6 +50,7 @@ public class AdminController : ControllerBase
 
     // Fetch active charging station locations
     [HttpGet("charging-stations/locations")]
+    [Authorize(Roles = "Backoffice,StationOperator")]
     public async Task<IActionResult> GetStationLocations()
     {
         var locations = await _dashboardService.GetActiveStationLocationsAsync();
@@ -56,6 +59,7 @@ public class AdminController : ControllerBase
 
     // Admin creates an EV Owner account
     [HttpPost("create-evowner")]
+    [Authorize(Roles = "Backoffice,StationOperator")]
     public async Task<IActionResult> CreateEVOwnerByAdmin([FromBody] AdminCreateEVOwnerDto ownerDto)
     {
         // Admin must not be able to set the role or password
@@ -73,6 +77,7 @@ public class AdminController : ControllerBase
 
     // Admin fetches all operational users (Backoffice and Station Operators)
     [HttpGet("operational-users")]
+    [Authorize(Roles = "Backoffice,StationOperator")]
     public async Task<IActionResult> GetAllOperationalUsers()
     {
         var users = await _userService.GetAllOperationalUsersAsync();
@@ -83,6 +88,7 @@ public class AdminController : ControllerBase
 
 
     [HttpGet("all-bookings")]
+    [Authorize(Roles = "Backoffice,StationOperator")]
     public async Task<IActionResult> GetAllBookings()
     {
         var bookings = await _bookingService.GetAllBookingsWithDetailsAsync();
