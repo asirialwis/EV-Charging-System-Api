@@ -541,8 +541,8 @@ namespace EVChargingSystem.WebAPI.Services
                 {
                     // Map ALL Booking fields (since BookingDataDto inherits from Booking)
                     Id = booking.Id,
-                    EVOwnerId = booking.EVOwnerId,
-                    StationId = booking.StationId,
+                    EVOwnerId = booking.EVOwnerId.ToString(),
+                    StationId = booking.StationId.ToString(),
                     SlotType = booking.SlotType,
                     SlotId = booking.SlotId,
                     StartTime = booking.StartTime,
