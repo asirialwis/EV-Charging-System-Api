@@ -26,5 +26,6 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
         Task<bool> AddOperatorToStationAsync(string assignedStationId, string id);
 
         Task<List<ChargingStation>> FindManyByIdsAsync(List<ObjectId> stationIds);
+        Task<List<Booking>> GetBookingsByStationIdAsync(ObjectId stationId);
     }
 }
