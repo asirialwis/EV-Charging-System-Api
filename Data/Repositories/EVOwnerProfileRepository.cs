@@ -70,15 +70,38 @@ namespace EVChargingApi.Data.Repositories
             // Return true if exactly one document was deleted
             return result.DeletedCount == 1;
         }
-        
 
 
-         public async Task<List<EVOwnerProfile>> FindManyByUserIdsAsync(List<ObjectId> userIds)
-    {
-        // Filter: Find all profiles whose UserId is IN the provided list of ObjectIds
-        var filter = Builders<EVOwnerProfile>.Filter.In(p => p.UserId, userIds);
-        
-        return await _profiles.Find(filter).ToListAsync();
-    }
+
+        public async Task<List<EVOwnerProfile>> FindManyByUserIdsAsync(List<ObjectId> userIds)
+        {
+            // Filter: Find all profiles whose UserId is IN the provided list of ObjectIds
+            var filter = Builders<EVOwnerProfile>.Filter.In(p => p.UserId, userIds);
+
+            return await _profiles.Find(filter).ToListAsync();
+        }
+
+
+        public async Task<EVOwnerProfile> FindByIdAsync(ObjectId profileId)
+        {
+            // Filter: Find the profile where the _id matches the provided ObjectId
+            var filter = Builders<EVOwnerProfile>.Filter.Eq(p => p.Id, profileId.ToString());
+
+            return await _profiles.Find(filter).FirstOrDefaultAsync();
+        }
+
+
+        public async Task<List<EVOwnerProfile>> FindManyByProfileIdsAsync(List<ObjectId> profileIds)
+        {
+            // 1. Convert the list of ObjectId primary keys to string representation for the query filter
+            var profileIdStrings = profileIds.Select(oid => oid.ToString()).ToList();
+
+            // 2. Define the filter: Find all profiles whose _id (Id property) is IN the provided list of strings
+            // The MongoDB C# driver efficiently handles the comparison of the string list against the BsonObjectId _id field.
+            var filter = Builders<EVOwnerProfile>.Filter.In(p => p.Id, profileIdStrings);
+
+            // 3. Execute the query
+            return await _profiles.Find(filter).ToListAsync();
+        }
     }
 }

@@ -503,40 +503,48 @@ namespace EVChargingSystem.WebAPI.Services
 
 
 
-      public async Task<List<BookingDataDto>> GetAllBookingsWithDetailsAsync()
+        public async Task<List<BookingDataDto>> GetAllBookingsWithDetailsAsync()
         {
             // 1. Fetch ALL bookings
             var allBookings = await _bookingRepository.GetAllBookingsAsync();
 
             // --- STEP 2: BULK DATA RETRIEVAL ---
-            
-            // Collect ALL necessary IDs in two separate lists
-            var evOwnerUserIds = allBookings.Select(b => b.EVOwnerId).Distinct().ToList();
+
+            // CRITICAL FIX: Collect Profile IDs (Primary Keys) and Station IDs
+            var profileIds = allBookings.Select(b => b.EVOwnerId).Distinct().ToList(); // Correctly collects the Profile _id
             var stationIds = allBookings.Select(b => b.StationId).Distinct().ToList();
 
             // Fetch profiles and stations in parallel (efficiency!)
-            var profilesTask = _profileRepository.FindManyByUserIdsAsync(evOwnerUserIds);
-            var stationsTask = _stationRepository.FindManyByIdsAsync(stationIds); // NEW BATCH FETCH
-            
+            // NOTE: The repository method must implement the fetch by List<ProfileID>
+            var profilesTask = _profileRepository.FindManyByProfileIdsAsync(profileIds); 
+            var stationsTask = _stationRepository.FindManyByIdsAsync(stationIds);
+
             await Task.WhenAll(profilesTask, stationsTask);
 
             // 3. Create fast lookup dictionaries
-            var profileLookup = profilesTask.Result.ToDictionary(p => p.UserId, p => p);
-            var stationLookup = stationsTask.Result.ToDictionary(s => new ObjectId(s.Id), s => s); // NEW LOOKUP
+            // Key is the Profile ID (Booking.EVOwnerId)
+            var profileLookup = profilesTask.Result.ToDictionary(p => new ObjectId(p.Id), p => p);
+            // Key is the Station ID
+            var stationLookup = stationsTask.Result.ToDictionary(s => new ObjectId(s.Id), s => s);
 
             // 4. Perform the in-memory 3-way join and mapping
             var result = allBookings.Select(booking =>
             {
+                // Join 1: Match Booking.EVOwnerId to Profile._id
                 profileLookup.TryGetValue(booking.EVOwnerId, out var profile);
+
+                // Join 2: Match Booking.StationId to Station._id
                 stationLookup.TryGetValue(booking.StationId, out var station);
 
                 // Initialize the DTO and map all booking fields
                 var dto = new BookingDataDto
                 {
+                    // Map ALL Booking fields (since BookingDataDto inherits from Booking)
                     Id = booking.Id,
                     EVOwnerId = booking.EVOwnerId,
                     StationId = booking.StationId,
                     SlotType = booking.SlotType,
+                    SlotId = booking.SlotId,
                     StartTime = booking.StartTime,
                     EndTime = booking.EndTime,
                     Status = booking.Status,
@@ -544,17 +552,17 @@ namespace EVChargingSystem.WebAPI.Services
                     CreatedAt = booking.CreatedAt,
                     UpdatedAt = booking.UpdatedAt,
                     BookingDate = booking.BookingDate,
-                    SlotId = booking.SlotId, // Ensure this required field is mapped
+                    // Assume SlotId = booking.SlotId is correctly mapped in the full code
 
                     // Joined EV Owner Data
                     EVOwnerFullName = profile?.FullName ?? "N/A",
                     EVOwnerNIC = profile?.Nic ?? "N/A",
-                    
-                    // Joined Station Data (NEW)
+
+                    // Joined Station Data
                     StationName = station?.StationName ?? "N/A",
                     StationCode = station?.StationCode ?? "N/A"
                 };
-                
+
                 return dto;
             }).ToList();
 

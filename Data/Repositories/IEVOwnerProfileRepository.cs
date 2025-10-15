@@ -13,7 +13,9 @@ namespace EVChargingApi.Data.Repositories
         Task<EVOwnerProfile> FindByUserIdAsync(string userId);
         Task<List<EVOwnerProfile>> GetAllProfilesAsync();
         Task<bool> DeleteAsync(string nic);
-        
-         Task<List<EVOwnerProfile>> FindManyByUserIdsAsync(List<ObjectId> userIds);
+
+        Task<List<EVOwnerProfile>> FindManyByUserIdsAsync(List<ObjectId> userIds);
+        Task<EVOwnerProfile> FindByIdAsync(ObjectId profileId);
+        Task<List<EVOwnerProfile>> FindManyByProfileIdsAsync(List<ObjectId> profileIds);
     }
 }
