@@ -56,9 +56,12 @@ public class BookingController : ControllerBase
         {
             var userId = GetUserId();
             var userRole = GetUserRole();
+
+            Console.WriteLine("BookingDto: " + System.Text.Json.JsonSerializer.Serialize(bookingDto));
+
             
             if (userRole == "EVOwner")
-            {
+            {   
                 bookingDto.EVOwnerId = userId;
             }
             else if (string.IsNullOrEmpty(bookingDto.EVOwnerId))

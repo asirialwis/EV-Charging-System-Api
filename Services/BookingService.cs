@@ -56,11 +56,6 @@ namespace EVChargingSystem.WebAPI.Services
                 };
             }
 
-            // Convert to UTC
-            TimeSpan istOffset = TimeSpan.FromHours(5.5);
-            var utcStartTime = request.StartTime.Subtract(istOffset);
-            var utcEndTime = request.EndTime.Subtract(istOffset);
-
             var stationId = new ObjectId(request.StationId);
 
             // Validate station exists and is active
@@ -87,7 +82,7 @@ namespace EVChargingSystem.WebAPI.Services
 
             // Get booked slot IDs for the time range
             var bookedSlotIds = await _bookingRepository.GetBookedSlotIdsAsync(
-                stationId, request.SlotType, utcStartTime, utcEndTime);
+                stationId, request.SlotType, request.StartTime, request.EndTime);
 
             // Find available slots
             var availableSlotIds = allSlots.Except(bookedSlotIds).ToList();
@@ -118,11 +113,6 @@ namespace EVChargingSystem.WebAPI.Services
                 return false; // Booking too far in future
             }
 
-            // Convert to UTC
-            TimeSpan istOffset = TimeSpan.FromHours(5.5);
-            var utcStartTime = dto.StartTime.Subtract(istOffset);
-            var utcEndTime = dto.EndTime.Subtract(istOffset);
-
             var stationId = new ObjectId(dto.StationId);
 
             // Validate station exists and is active
@@ -134,7 +124,7 @@ namespace EVChargingSystem.WebAPI.Services
 
             // Check slot availability
             var isSlotAvailable = await _bookingRepository.CheckSlotAvailabilityAsync(
-                stationId, dto.SlotId, utcStartTime, utcEndTime, null);
+                stationId, dto.SlotId, dto.StartTime, dto.EndTime, null);
 
             if (!isSlotAvailable)
             {
@@ -155,13 +145,16 @@ namespace EVChargingSystem.WebAPI.Services
                 StationId = stationId,
                 SlotType = dto.SlotType,
                 SlotId = dto.SlotId,
-                StartTime = utcStartTime,
-                EndTime = utcEndTime,
+                StartTime = dto.StartTime,
+                EndTime = dto.EndTime,
                 Status = initialStatus,
                 BookingDate = DateTime.UtcNow.Date,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
+
+            Console.WriteLine("Booking: " + System.Text.Json.JsonSerializer.Serialize(booking));
+
 
             await _bookingRepository.CreateAsync(booking);
 
@@ -244,10 +237,9 @@ namespace EVChargingSystem.WebAPI.Services
                 return false; // Too close to start time
             }
 
-            // Convert times to UTC if provided
-            TimeSpan istOffset = TimeSpan.FromHours(5.5);
-            var utcStartTime = dto.StartTime?.Subtract(istOffset) ?? booking.StartTime;
-            var utcEndTime = dto.EndTime?.Subtract(istOffset) ?? booking.EndTime;
+            // Use provided times or keep existing ones
+            var startTime = dto.StartTime ?? booking.StartTime;
+            var endTime = dto.EndTime ?? booking.EndTime;
 
             // Check slot availability if changing slot or time
             if (dto.SlotId != null || dto.StartTime != null || dto.EndTime != null)
@@ -256,7 +248,7 @@ namespace EVChargingSystem.WebAPI.Services
                 var slotId = dto.SlotId ?? booking.SlotId;
 
                 var isSlotAvailable = await _bookingRepository.CheckSlotAvailabilityAsync(
-                    stationId, slotId, utcStartTime, utcEndTime, bookingId);
+                    stationId, slotId, startTime, endTime, bookingId);
 
                 if (!isSlotAvailable)
                 {
@@ -279,8 +271,8 @@ namespace EVChargingSystem.WebAPI.Services
             if (dto.StationId != null) updates.Add(updateBuilder.Set(b => b.StationId, new ObjectId(dto.StationId)));
             if (dto.SlotType != null) updates.Add(updateBuilder.Set(b => b.SlotType, dto.SlotType));
             if (dto.SlotId != null) updates.Add(updateBuilder.Set(b => b.SlotId, dto.SlotId));
-            if (dto.StartTime != null) updates.Add(updateBuilder.Set(b => b.StartTime, utcStartTime));
-            if (dto.EndTime != null) updates.Add(updateBuilder.Set(b => b.EndTime, utcEndTime));
+            if (dto.StartTime != null) updates.Add(updateBuilder.Set(b => b.StartTime, startTime));
+            if (dto.EndTime != null) updates.Add(updateBuilder.Set(b => b.EndTime, endTime));
 
             updates.Add(updateBuilder.Set(b => b.Status, newStatus));
             updates.Add(updateBuilder.Set(b => b.UpdatedAt, DateTime.UtcNow));
@@ -456,9 +448,6 @@ namespace EVChargingSystem.WebAPI.Services
         //get booking data for operator assign
         public async Task<OperatorBookingDetailDto?> GetFullBookingDetailsForOperatorAsync(ObjectId bookingId)
         {
-            // IST/SLST Offset
-            TimeSpan istOffset = TimeSpan.FromHours(5.5);
-
             // 1. Fetch the core Booking document
             var booking = await _bookingRepository.FindByIdAsync(bookingId);
             if (booking == null) return null;
@@ -485,9 +474,9 @@ namespace EVChargingSystem.WebAPI.Services
                 SlotId = booking.SlotId,
                 Status = booking.Status,
 
-                // Convert UTC time to local IST/SLST time for the operator
-                StartTimeLocal = booking.StartTime.Add(istOffset),
-                EndTimeLocal = booking.EndTime.Add(istOffset),
+                // Use UTC times directly (frontend will handle timezone conversion)
+                StartTimeLocal = booking.StartTime,
+                EndTimeLocal = booking.EndTime,
 
                 // Mapped Owner Details
                 EVOwnerFullName = profile.FullName,
