@@ -232,7 +232,7 @@ namespace EVChargingSystem.WebAPI.Services
 
             // 12-hour validation
             var timeUntilStart = booking.StartTime - DateTime.UtcNow;
-            if (timeUntilStart.TotalHours < 12)
+            if (timeUntilStart.TotalHours < 12 && dto.Status == null)
             {
                 return false; // Too close to start time
             }
@@ -256,13 +256,23 @@ namespace EVChargingSystem.WebAPI.Services
                 }
             }
 
-            // Determine new status based on role
-            string newStatus = userRole switch
+            // Determine new status: Use DTO status if provided, otherwise determine by role
+            string newStatus;
+            if (!string.IsNullOrEmpty(dto.Status))
             {
-                "EVOwner" => "Pending",
-                "Backoffice" or "StationOperator" => "Approved",
-                _ => "Pending"
-            };
+                // Use the status from DTO if explicitly provided
+                newStatus = dto.Status;
+            }
+            else
+            {
+                // Fallback to role-based status determination
+                newStatus = userRole switch
+                {
+                    "EVOwner" => "Pending",
+                    "Backoffice" or "StationOperator" => "Approved",
+                    _ => "Pending"
+                };
+            }
 
             // Build update definition
             var updateBuilder = Builders<Booking>.Update;
@@ -270,6 +280,7 @@ namespace EVChargingSystem.WebAPI.Services
 
             if (dto.StationId != null) updates.Add(updateBuilder.Set(b => b.StationId, new ObjectId(dto.StationId)));
             if (dto.SlotType != null) updates.Add(updateBuilder.Set(b => b.SlotType, dto.SlotType));
+            
             if (dto.SlotId != null) updates.Add(updateBuilder.Set(b => b.SlotId, dto.SlotId));
             if (dto.StartTime != null) updates.Add(updateBuilder.Set(b => b.StartTime, startTime));
             if (dto.EndTime != null) updates.Add(updateBuilder.Set(b => b.EndTime, endTime));
@@ -317,7 +328,7 @@ namespace EVChargingSystem.WebAPI.Services
             if (booking == null) return false;
 
             // Only allow deletion of completed or canceled bookings
-            if (booking.Status != "Completed" && booking.Status != "Canceled")
+            if (booking.Status != "Completed" && booking.Status != "Cancelled")
             {
                 return false;
             }
