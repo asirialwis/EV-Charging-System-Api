@@ -568,5 +568,57 @@ namespace EVChargingSystem.WebAPI.Services
 
             return result;
         }
+
+        //get approved or pending bookings for a specific station
+        //if no bookings found, update station status to deactivated
+        public async Task<(List<BookingResponseDto> Bookings, bool StationDeactivated, string Message)> GetApprovedOrPendingBookingsForStationAsync(string stationId)
+        {
+            if (!ObjectId.TryParse(stationId, out var stationObjectId))
+            {
+                return (new List<BookingResponseDto>(), false, "Invalid Station ID format.");
+            }
+
+            // Get approved or pending bookings
+            var bookings = await _bookingRepository.GetApprovedOrPendingBookingsByStationIdAsync(stationObjectId);
+
+            // If there are bookings, station CANNOT be deactivated
+            if (bookings.Any())
+            {
+                // Map to simple DTOs with basic info (no aggregation)
+                var basicBookingDtos = bookings.Select(b => new BookingResponseDto
+                {
+                    Id = b.Id,
+                    EVOwnerId = b.EVOwnerId.ToString(),
+                    StationId = b.StationId.ToString(),
+                    SlotType = b.SlotType,
+                    SlotId = b.SlotId,
+                    StartTime = b.StartTime,
+                    EndTime = b.EndTime,
+                    Status = b.Status,
+                    BookingDate = b.BookingDate,
+                    CreatedAt = b.CreatedAt,
+                    UpdatedAt = b.UpdatedAt,
+                    QrCodeBase64 = b.QrCodeBase64
+                }).ToList();
+
+                return (basicBookingDtos, false, $"Station cannot be deactivated. Found {bookings.Count} approved or pending booking(s).");
+            }
+
+            // No approved or pending bookings found - deactivate the station
+            var updateDefinition = Builders<ChargingStation>.Update
+                .Set(s => s.Status, "Deactivated")
+                .Set(s => s.UpdatedAt, DateTime.UtcNow);
+
+            var updateSuccess = await _stationRepository.PartialUpdateAsync(stationId, updateDefinition);
+
+            if (updateSuccess)
+            {
+                return (new List<BookingResponseDto>(), true, "No approved or pending bookings found. Station status has been updated to Deactivated.");
+            }
+            else
+            {
+                return (new List<BookingResponseDto>(), false, "No approved or pending bookings found, but failed to update station status.");
+            }
+        }
     }
 }

@@ -423,5 +423,18 @@ namespace EVChargingSystem.WebAPI.Services
         }
 
 
+        // Reactivate a deactivated station
+        public async Task<bool> ReactivateStationAsync(string stationId)
+        {
+            if (!ObjectId.TryParse(stationId, out var id)) return false;
+
+            // Update station status to Active
+            var updateDefinition = Builders<ChargingStation>.Update
+                .Set(s => s.Status, "Active")
+                .Set(s => s.UpdatedAt, DateTime.UtcNow);
+
+            return await _stationRepository.PartialUpdateAsync(stationId, updateDefinition);
+        }
+
     }
 }

@@ -37,6 +37,7 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
         Task<bool> DeleteBookingAsync(string bookingId);
         Task<bool> CheckSlotAvailabilityAsync(ObjectId stationId, string slotId, DateTime start, DateTime end, string? excludeBookingId);
         Task<List<string>> GetBookedSlotIdsAsync(ObjectId stationId, string slotType, DateTime start, DateTime end);
+        Task<List<Booking>> GetApprovedOrPendingBookingsByStationIdAsync(ObjectId stationId);
 
 
        

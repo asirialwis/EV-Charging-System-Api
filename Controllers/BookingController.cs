@@ -147,6 +147,29 @@ public class BookingController : ControllerBase
         }
     }
 
+    // Check approved or pending bookings for a specific station
+    // If no bookings found, station status is updated to deactivated
+    [HttpPost("station/{stationId}/check-and-deactivate")]
+    [Authorize(Roles = "Backoffice,StationOperator")]
+    public async Task<IActionResult> CheckAndDeactivateStation(string stationId)
+    {
+        try
+        {
+            var (bookings, stationDeactivated, message) = await _bookingService.GetApprovedOrPendingBookingsForStationAsync(stationId);
+            
+            return Ok(new 
+            { 
+                Bookings = bookings,
+                StationDeactivated = stationDeactivated,
+                Message = message
+            });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(ex.Message);
+        }
+    }
+
     // Get all bookings (Backoffice only)
     [HttpGet("all")]
     [Authorize(Roles = "Backoffice")]

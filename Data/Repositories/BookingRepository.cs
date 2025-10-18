@@ -232,5 +232,24 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
             return bookings.Select(b => b.SlotId).Distinct().ToList();
         }
 
+        // Get approved or pending bookings for a specific station
+        public async Task<List<Booking>> GetApprovedOrPendingBookingsByStationIdAsync(ObjectId stationId)
+        {
+            var filter = Builders<Booking>.Filter.And(
+                Builders<Booking>.Filter.Eq(b => b.StationId, stationId),
+                Builders<Booking>.Filter.Or(
+                    Builders<Booking>.Filter.Eq(b => b.Status, "Approved"),
+                    Builders<Booking>.Filter.Eq(b => b.Status, "Pending")
+                )
+            );
+
+            var bookings = await _bookings
+                .Find(filter)
+                .SortByDescending(b => b.CreatedAt)
+                .ToListAsync();
+
+            return bookings;
+        }
+
     }
 }
