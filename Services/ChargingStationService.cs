@@ -371,22 +371,26 @@ namespace EVChargingSystem.WebAPI.Services
             // --- STEP 2: BULK DATA RETRIEVAL (Joins) ---
 
             // Collect all necessary IDs for efficient batch lookups
-            var profileIds = stationBookings.Select(b => b.EVOwnerId).Distinct().ToList();
+            // NOTE: Using EVOwnerId (which is User._id stored in Booking) to join with EVOwnerProfile.UserId
+            var userIds = stationBookings.Select(b => b.EVOwnerId).Distinct().ToList();
             var stationIds = stationBookings.Select(b => b.StationId).Distinct().ToList();
 
             // Fetch profiles and stations in parallel (efficiency!)
-            var profilesTask = _profileRepository.FindManyByProfileIdsAsync(profileIds);
+            // IMPORTANT: Using FindManyByUserIdsAsync to match Booking.EVOwnerId with EVOwnerProfile.UserId
+            var profilesTask = _profileRepository.FindManyByUserIdsAsync(userIds);
             var stationsTask = _stationRepository.FindManyByIdsAsync(stationIds);
 
             await Task.WhenAll(profilesTask, stationsTask);
 
             // 3. Create fast lookup dictionaries
-            var profileLookup = profilesTask.Result.ToDictionary(p => new ObjectId(p.Id), p => p);
+            // Key is UserId (matches Booking.EVOwnerId), NOT Profile._id
+            var profileLookup = profilesTask.Result.ToDictionary(p => p.UserId, p => p);
             var stationLookup = stationsTask.Result.ToDictionary(s => new ObjectId(s.Id), s => s);
 
             // 4. Perform the in-memory 3-way join and mapping
             var result = stationBookings.Select(booking =>
             {
+                // Join using Booking.EVOwnerId (which matches EVOwnerProfile.UserId)
                 profileLookup.TryGetValue(booking.EVOwnerId, out var profile);
                 stationLookup.TryGetValue(booking.StationId, out var station);
 
