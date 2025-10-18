@@ -35,7 +35,7 @@ public class StationsController : ControllerBase
     }
     // Get all stations for assignment (Admin only)
     [HttpGet("stations/all-for-assignment")]
-    [Authorize(Roles = "Backoffice")]
+    [Authorize(Roles = "Backoffice,StationOperator")]
     public async Task<IActionResult> GetAllStationsForAssignment()
     {
         var stations = await _stationService.GetAllStationsForAssignmentAsync();
