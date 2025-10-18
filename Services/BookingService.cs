@@ -463,12 +463,15 @@ namespace EVChargingSystem.WebAPI.Services
             var booking = await _bookingRepository.FindByIdAsync(bookingId);
             if (booking == null) return null;
 
-            // 2. Fetch the EV Owner Profile (using the EVOwnerId from the booking)
-            var profile = await _profileRepository.FindByUserIdAsync(booking.EVOwnerId.ToString());
+            // 2. Fetch Profile and Station in parallel (efficiency!)
+            // Match Booking.EVOwnerId with EVOwnerProfile.UserId
+            var profileTask = _profileRepository.FindByUserIdAsync(booking.EVOwnerId.ToString());
+            var stationTask = _stationRepository.FindByIdAsync(booking.StationId);
 
-            // 3. Fetch the Charging Station details (using the StationId from the booking)
-            // You need a FindByIdAsync method in IChargingStationRepository for this.
-            var station = await _stationRepository.FindByIdAsync(booking.StationId);
+            await Task.WhenAll(profileTask, stationTask);
+
+            var profile = profileTask.Result;
+            var station = stationTask.Result;
 
             // If critical data (Profile or Station) is missing, fail gracefully
             if (profile == null || station == null)
@@ -477,7 +480,7 @@ namespace EVChargingSystem.WebAPI.Services
                 return null;
             }
 
-            // 4. Map and return the combined DTO
+            // 3. Map and return the combined DTO
             return new OperatorBookingDetailDto
             {
                 BookingId = booking.Id,
@@ -510,27 +513,27 @@ namespace EVChargingSystem.WebAPI.Services
 
             // --- STEP 2: BULK DATA RETRIEVAL ---
 
-            // CRITICAL FIX: Collect Profile IDs (Primary Keys) and Station IDs
-            var profileIds = allBookings.Select(b => b.EVOwnerId).Distinct().ToList(); // Correctly collects the Profile _id
+            // Collect User IDs (from Booking.EVOwnerId) and Station IDs
+            var userIds = allBookings.Select(b => b.EVOwnerId).Distinct().ToList(); // User IDs for join
             var stationIds = allBookings.Select(b => b.StationId).Distinct().ToList();
 
             // Fetch profiles and stations in parallel (efficiency!)
-            // NOTE: The repository method must implement the fetch by List<ProfileID>
-            var profilesTask = _profileRepository.FindManyByProfileIdsAsync(profileIds); 
+            // NOTE: Using FindManyByUserIdsAsync to match Booking.EVOwnerId with EVOwnerProfile.UserId
+            var profilesTask = _profileRepository.FindManyByUserIdsAsync(userIds); 
             var stationsTask = _stationRepository.FindManyByIdsAsync(stationIds);
 
             await Task.WhenAll(profilesTask, stationsTask);
 
             // 3. Create fast lookup dictionaries
-            // Key is the Profile ID (Booking.EVOwnerId)
-            var profileLookup = profilesTask.Result.ToDictionary(p => new ObjectId(p.Id), p => p);
+            // Key is the User ID (EVOwnerProfile.UserId matches Booking.EVOwnerId)
+            var profileLookup = profilesTask.Result.ToDictionary(p => p.UserId, p => p);
             // Key is the Station ID
             var stationLookup = stationsTask.Result.ToDictionary(s => new ObjectId(s.Id), s => s);
 
             // 4. Perform the in-memory 3-way join and mapping
             var result = allBookings.Select(booking =>
             {
-                // Join 1: Match Booking.EVOwnerId to Profile._id
+                // Join 1: Match Booking.EVOwnerId to EVOwnerProfile.UserId
                 profileLookup.TryGetValue(booking.EVOwnerId, out var profile);
 
                 // Join 2: Match Booking.StationId to Station._id
