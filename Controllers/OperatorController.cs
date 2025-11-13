@@ -12,10 +12,12 @@ using System.Threading.Tasks;
 public class OperatorController : ControllerBase
 {
     private readonly IBookingService _bookingService;
+    private readonly IChargingStationService _stationService;
 
-    public OperatorController(IBookingService bookingService)
+    public OperatorController(IBookingService bookingService, IChargingStationService stationService)
     {
         _bookingService = bookingService;
+        _stationService = stationService;
     }
 
     [HttpGet("validate-qr/{bookingId}")]
@@ -27,9 +29,9 @@ public class OperatorController : ControllerBase
             return BadRequest("Invalid QR code payload (Booking ID).");
         }
 
-        var booking = await _bookingService.GetFullBookingDetailsForOperatorAsync(id); 
-         
-        
+        var booking = await _bookingService.GetFullBookingDetailsForOperatorAsync(id);
+
+
         // Validation check
         if (booking == null || booking.Status != "Approved") // Only approved bookings can be validated
         {
@@ -37,7 +39,7 @@ public class OperatorController : ControllerBase
         }
 
         // Returns booking details for the operator to confirm
-        return Ok(booking); 
+        return Ok(booking);
     }
 
     [HttpPost("finalize/{bookingId}")]
@@ -48,14 +50,36 @@ public class OperatorController : ControllerBase
         {
             return BadRequest("Invalid Booking ID.");
         }
-        
+
         var success = await _bookingService.FinalizeBookingAsync(id);
-        
+
         if (!success)
         {
             return BadRequest("Could not finalize booking. Check status or existence.");
         }
 
         return Ok(new { Message = "Charging session finalized and marked as completed." });
+    }
+
+
+
+    [HttpGet("manifest/{stationId}")]
+    public async Task<IActionResult> GetStationManifest(string stationId)
+    {
+
+
+        if (string.IsNullOrWhiteSpace(stationId))
+        {
+            return BadRequest("Station ID must be provided.");
+        }
+
+        var manifest = await _stationService.GetStationManifestWithDetailsAsync(stationId);
+
+        if (manifest.Count == 0)
+        {
+            return NotFound("No bookings found for this station.");
+        }
+
+        return Ok(manifest);
     }
 }

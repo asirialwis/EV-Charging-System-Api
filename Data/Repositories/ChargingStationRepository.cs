@@ -162,5 +162,25 @@ namespace EVChargingSystem.WebAPI.Data.Repositories
 
             return result.ModifiedCount == 1;
         }
+
+        public async Task<List<ChargingStation>> FindManyByIdsAsync(List<ObjectId> stationIds)
+        {
+            // Filter: Find all stations whose _id is IN the list of ObjectIds
+            var filter = Builders<ChargingStation>.Filter.In(s => s.Id, stationIds.Select(oid => oid.ToString()));
+
+            return await _stations.Find(filter).ToListAsync();
+        }
+
+
+        public async Task<List<Booking>> GetBookingsByStationIdAsync(ObjectId stationId)
+        {
+            // Filter: Find all documents where StationId matches the provided ObjectId
+            var filter = Builders<Booking>.Filter.Eq(b => b.StationId, stationId);
+
+            // Sort by creation date or start time for easy viewing
+            return await _bookings.Find(filter)
+                .SortBy(b => b.StartTime)
+                .ToListAsync();
+        }
     }
 }

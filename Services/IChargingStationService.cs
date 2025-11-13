@@ -17,5 +17,9 @@ namespace EVChargingSystem.WebAPI.Services
         Task<List<StationWithBookingsDto>> GetStationsWithUpcomingBookingsAsync();
 
         Task<List<StationWithBookingsDto>> GetAllStationsWithDetailsAsync();
+
+       Task<List<BookingDataDto>> GetStationManifestWithDetailsAsync(string stationId);
+       
+       Task<bool> ReactivateStationAsync(string stationId);
     }
 }

@@ -1,4 +1,5 @@
 //services for charging station. crud operations and other business logic
+using EVChargingApi.Data.Repositories;
 using EVChargingSystem.WebAPI.Data.Dtos;
 using EVChargingSystem.WebAPI.Data.Models;
 using EVChargingSystem.WebAPI.Data.Repositories;
@@ -12,12 +13,15 @@ namespace EVChargingSystem.WebAPI.Services
         private readonly IChargingStationRepository _stationRepository;
         private readonly IUserRepository _userRepository;
         private readonly IBookingRepository _bookingRepository; // For booking checks during deactivation`
+        private readonly IEVOwnerProfileRepository _profileRepository;
 
-        public ChargingStationService(IChargingStationRepository stationRepository, IUserRepository userRepository, IBookingRepository bookingRepository)
+
+        public ChargingStationService(IChargingStationRepository stationRepository, IUserRepository userRepository, IBookingRepository bookingRepository, IEVOwnerProfileRepository profileRepository)
         {
             _stationRepository = stationRepository;
             _userRepository = userRepository;
-            _bookingRepository = bookingRepository; // For booking checks during deactivation
+            _bookingRepository = bookingRepository;
+            _profileRepository = profileRepository;
         }
 
         // Create a new charging station
@@ -192,7 +196,7 @@ namespace EVChargingSystem.WebAPI.Services
             return await _stationRepository.PartialUpdateAsync(stationId, combinedUpdate);
         }
 
-// Get all stations with their upcoming bookings (max 2) and operator details       
+        // Get all stations with their upcoming bookings (max 2) and operator details       
         public async Task<List<StationWithBookingsDto>> GetStationsWithUpcomingBookingsAsync()
         {
             // IST/SLST Offset
@@ -349,6 +353,92 @@ namespace EVChargingSystem.WebAPI.Services
             return result;
         }
 
+
+
+        public async Task<List<BookingDataDto>> GetStationManifestWithDetailsAsync(string stationId)
+        {
+            if (!ObjectId.TryParse(stationId, out var stationObjectId))
+            {
+                return new List<BookingDataDto>();
+            }
+
+            // 1. Fetch FILTERED bookings: ONLY for the specified station ID
+            var stationBookings = await _bookingRepository.GetBookingsByStationIdAsync(stationObjectId);
+
+            if (!stationBookings.Any()) return new List<BookingDataDto>();
+
+
+            // --- STEP 2: BULK DATA RETRIEVAL (Joins) ---
+
+            // Collect all necessary IDs for efficient batch lookups
+            // NOTE: Using EVOwnerId (which is User._id stored in Booking) to join with EVOwnerProfile.UserId
+            var userIds = stationBookings.Select(b => b.EVOwnerId).Distinct().ToList();
+            var stationIds = stationBookings.Select(b => b.StationId).Distinct().ToList();
+
+            // Fetch profiles and stations in parallel (efficiency!)
+            // IMPORTANT: Using FindManyByUserIdsAsync to match Booking.EVOwnerId with EVOwnerProfile.UserId
+            var profilesTask = _profileRepository.FindManyByUserIdsAsync(userIds);
+            var stationsTask = _stationRepository.FindManyByIdsAsync(stationIds);
+
+            await Task.WhenAll(profilesTask, stationsTask);
+
+            // 3. Create fast lookup dictionaries
+            // Key is UserId (matches Booking.EVOwnerId), NOT Profile._id
+            var profileLookup = profilesTask.Result.ToDictionary(p => p.UserId, p => p);
+            var stationLookup = stationsTask.Result.ToDictionary(s => new ObjectId(s.Id), s => s);
+
+            // 4. Perform the in-memory 3-way join and mapping
+            var result = stationBookings.Select(booking =>
+            {
+                // Join using Booking.EVOwnerId (which matches EVOwnerProfile.UserId)
+                profileLookup.TryGetValue(booking.EVOwnerId, out var profile);
+                stationLookup.TryGetValue(booking.StationId, out var station);
+
+                // Map all fields explicitly to the clean DTO
+                var dto = new BookingDataDto
+                {
+                    // --- Booking Data Mapping ---
+                    Id = booking.Id,
+                    EVOwnerId = booking.EVOwnerId.ToString(),
+                    StationId = booking.StationId.ToString(),
+                    SlotType = booking.SlotType,
+                    SlotId = booking.SlotId,
+                    StartTime = booking.StartTime,
+                    EndTime = booking.EndTime,
+                    Status = booking.Status,
+                    QrCodeBase64 = booking.QrCodeBase64,
+                    CreatedAt = booking.CreatedAt,
+                    UpdatedAt = booking.UpdatedAt,
+                    BookingDate = booking.BookingDate,
+
+                    // --- Joined EV Owner Data ---
+                    EVOwnerFullName = profile?.FullName ?? "N/A",
+                    EVOwnerNIC = profile?.Nic ?? "N/A",
+
+                    // --- Joined Station Data ---
+                    StationName = station?.StationName ?? "N/A",
+                    StationCode = station?.StationCode ?? "N/A"
+                };
+
+                return dto;
+            }).ToList();
+
+            return result;
+        }
+
+
+        // Reactivate a deactivated station
+        public async Task<bool> ReactivateStationAsync(string stationId)
+        {
+            if (!ObjectId.TryParse(stationId, out var id)) return false;
+
+            // Update station status to Active
+            var updateDefinition = Builders<ChargingStation>.Update
+                .Set(s => s.Status, "Active")
+                .Set(s => s.UpdatedAt, DateTime.UtcNow);
+
+            return await _stationRepository.PartialUpdateAsync(stationId, updateDefinition);
+        }
 
     }
 }

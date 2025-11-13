@@ -36,6 +36,7 @@ namespace EVChargingApi.Services
             return new EVOwnerDetailsDto
             {
                 Id = profile.Id,
+                UserId = profile.UserId.ToString(),
                 Nic = profile.Nic,
                 Email = user.Email,
                 FullName = profile.FullName,

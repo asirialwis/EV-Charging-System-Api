@@ -56,9 +56,12 @@ public class BookingController : ControllerBase
         {
             var userId = GetUserId();
             var userRole = GetUserRole();
+
+            Console.WriteLine("BookingDto: " + System.Text.Json.JsonSerializer.Serialize(bookingDto));
+
             
             if (userRole == "EVOwner")
-            {
+            {   
                 bookingDto.EVOwnerId = userId;
             }
             else if (string.IsNullOrEmpty(bookingDto.EVOwnerId))
@@ -137,6 +140,29 @@ public class BookingController : ControllerBase
         {
             var result = await _bookingService.GetBookingsForStationAsync(stationId);
             return Ok(result);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(ex.Message);
+        }
+    }
+
+    // Check approved or pending bookings for a specific station
+    // If no bookings found, station status is updated to deactivated
+    [HttpPost("station/{stationId}/check-and-deactivate")]
+    [Authorize(Roles = "Backoffice,StationOperator")]
+    public async Task<IActionResult> CheckAndDeactivateStation(string stationId)
+    {
+        try
+        {
+            var (bookings, stationDeactivated, message) = await _bookingService.GetApprovedOrPendingBookingsForStationAsync(stationId);
+            
+            return Ok(new 
+            { 
+                Bookings = bookings,
+                StationDeactivated = stationDeactivated,
+                Message = message
+            });
         }
         catch (UnauthorizedAccessException ex)
         {
