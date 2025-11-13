@@ -35,7 +35,7 @@ public class StationsController : ControllerBase
     }
     // Get all stations for assignment (Admin only)
     [HttpGet("stations/all-for-assignment")]
-    [Authorize(Roles = "Backoffice")]
+    [Authorize(Roles = "Backoffice,StationOperator")]
     public async Task<IActionResult> GetAllStationsForAssignment()
     {
         var stations = await _stationService.GetAllStationsForAssignmentAsync();
@@ -75,5 +75,20 @@ public class StationsController : ControllerBase
     {
         var stations = await _stationService.GetAllStationsWithDetailsAsync();
         return Ok(stations);
+    }
+
+    // Reactivate a deactivated station (Admin only)
+    [HttpPost("{id}/reactivate")]
+    [Authorize(Roles = "Backoffice")]
+    public async Task<IActionResult> ReactivateStation(string id)
+    {
+        var success = await _stationService.ReactivateStationAsync(id);
+
+        if (!success)
+        {
+            return BadRequest("Failed to reactivate station. Station ID may be invalid.");
+        }
+
+        return Ok(new { Message = "Station reactivated successfully." });
     }
 }

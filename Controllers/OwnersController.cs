@@ -25,7 +25,7 @@ public class EVOwnersController : ControllerBase
 
     // U - Update EV Owner Profile (Used by Admin and Owner)
     [HttpPatch("{nic}")]
-    [Authorize(Roles = "Backoffice, EVOwner")]
+    [Authorize(Roles = "Backoffice, EVOwner, StationOperator")]
     public async Task<IActionResult> UpdateEVOwner(string nic, [FromBody] UpdateEVOwnerDto updateDto)
     {
         // 1. Get Logged-in User ID and Role from JWT Claims
@@ -70,9 +70,9 @@ public class EVOwnersController : ControllerBase
         return Ok(profileDto);
     }
 
-    // Get all EV Owners (Admin and EVOwner themselves)
+    // Get all EV Owners (Admin, and StationOperator)
     [HttpGet]
-    [Authorize(Roles = "Backoffice, EVOwner")]
+    [Authorize(Roles = "Backoffice,StationOperator")]
     public async Task<IActionResult> GetAllEVOwners()
     {
         var owners = await _userService.GetAllEVOwnersAsync();
